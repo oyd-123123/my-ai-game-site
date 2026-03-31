@@ -514,19 +514,74 @@ const STORY_PROMPTS = {
   }
 
   async function saveGame() {
-    const name = document.getElementById('gameName').value.trim();
-    const description = document.getElementById('gameDescription').value.trim();
+    let name = document.getElementById('gameName').value.trim();
+    let description = document.getElementById('gameDescription').value.trim();
     const code = document.getElementById('codeArea').value.trim();
-
-    if (!name) {
-      alert('请输入游戏名称！');
-      return;
-    }
 
     if (!code) {
       alert('没有游戏代码可保存！');
       return;
     }
+
+    // 如果没有填写名称或描述，用 AI 自动生成
+    if (!name || !description) {
+      const apiKey = getApiKey();
+      if (!apiKey) {
+        alert('请先填写 API Key！');
+        return;
+      }
+      
+      // 显示加载状态
+      const saveBtn = document.querySelector('#saveModal .btn-primary');
+      const originalText = saveBtn.textContent;
+      saveBtn.textContent = '🤖 AI生成名称中...';
+      saveBtn.disabled = true;
+
+      try {
+        const prompt = `根据以下游戏代码，分析游戏玩法和特点，生成一个简短的游戏名称（不超过20字）和游戏描述（不超过50字）。格式：名称|描述
+        
+游戏代码预览：
+${code.slice(0, 500)}
+        
+只输出"名称|描述"，不要其他内容。`;
+
+        const res = await fetch(API_CONFIG.apiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + apiKey
+          },
+          body: JSON.stringify({
+            model: API_CONFIG.endpoint,
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.7,
+            max_tokens: 100
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const result = data.choices?.[0]?.message?.content?.trim() || '';
+          const parts = result.split('|');
+          if (!name && parts[0]) name = parts[0].trim().slice(0, 20);
+          if (!description && parts[1]) description = parts[1].trim().slice(0, 50);
+        }
+      } catch (e) {
+        console.warn('AI生成名称失败', e);
+      }
+
+      // 恢复按钮
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
+
+      // 如果AI也没生成，给默认值
+      if (!name) name = '未命名游戏_' + Date.now();
+      if (!description) description = 'AI生成的游戏';
+    }
+
+    // 填入自动生成的值，方便用户修改
+    document.getElementById('gameName').value = name;
+    document.getElementById('gameDescription').value = description;
 
     try {
       // 从IndexedDB获取现有游戏
