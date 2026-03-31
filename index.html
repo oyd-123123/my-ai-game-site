@@ -1130,6 +1130,19 @@ const STORY_PROMPTS = {
     
     await updateReferenceGames(); // 初始化参考游戏列表
     initAutoSave(); // 初始化自动保存
+
+    // 从 localStorage 恢复 API 配置
+    if (typeof API_CONFIG !== 'undefined') {
+      const savedApiKey = localStorage.getItem('LLM_API_KEY');
+      if (savedApiKey && !API_CONFIG.apiKey) {
+        API_CONFIG.apiKey = savedApiKey;
+        document.getElementById('apiKeyInput').value = savedApiKey;
+      }
+      const savedGistToken = localStorage.getItem('GIST_TOKEN');
+      if (savedGistToken) {
+        document.getElementById('gistTokenInput').value = savedGistToken;
+      }
+    }
   });
 
 </script>
