@@ -4,18 +4,35 @@ const PUBLIC_GAMES_CONFIG = {
   gistId: '3b957cf4aea0a7b8a2a2435452917b93',
   gistOwner: 'oyd-123123',
   filename: 'games-db.json',
-  // Token 仅用于写入 Gist，从 config.js 或本地存储读取，不硬编码
-  get token() {
-    return (typeof GIST_TOKEN !== 'undefined' && GIST_TOKEN)
-      || localStorage.getItem('GIST_TOKEN')
-      || '';
-  },
+  tokenGistId: '72a59e22f75354461958cbbb5eb1b6a0', // 存 Token 的私有 gist
+  _token: null,
+
   get rawUrl() {
     return `https://gist.githubusercontent.com/${this.gistOwner}/${this.gistId}/raw/${this.filename}?t=${Date.now()}`;
   },
   get apiUrl() {
     return `https://api.github.com/gists/${this.gistId}`;
-  }
+  },
+
+  // 从私有 Gist 读取 Token
+  async getToken() {
+    if (this._token) return this._token;
+    try {
+      const res = await fetch(`https://gist.githubusercontent.com/${this.gistOwner}/${this.tokenGistId}/raw/gist-token.js?t=${Date.now()}`);
+      if (!res.ok) throw new Error('token fetch failed');
+      const text = await res.text();
+      const match = text.match(/GIST_TOKEN\s*=\s*['"]([^'"]+)['"]/);
+      if (match) {
+        this._token = match[1];
+        return this._token;
+      }
+    } catch (e) {
+      console.warn('读取 Token 失败', e);
+    }
+    return '';
+  },
+
+  get token() { return this._token; }
 };
 
 const publicGames = {
@@ -44,6 +61,12 @@ const publicGames = {
 
   // 发布游戏到公共库（直接写入 Gist）
   async addGame(game) {
+    // 先获取 Token
+    const token = await PUBLIC_GAMES_CONFIG.getToken();
+    if (!token) {
+      throw new Error('无法获取发布权限，请刷新页面重试');
+    }
+
     // 先读取最新列表
     this._cache = null; // 强制刷新
     const games = await this.getAll();
@@ -70,7 +93,7 @@ const publicGames = {
     const res = await fetch(PUBLIC_GAMES_CONFIG.apiUrl, {
       method: 'PATCH',
       headers: {
-        'Authorization': 'Bearer ' + PUBLIC_GAMES_CONFIG.token,
+        'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
         'Accept': 'application/vnd.github+json'
       },
@@ -94,6 +117,10 @@ const publicGames = {
 
   // 从公共库删除游戏（仅站长用）
   async removeGame(gameId) {
+    const token = await PUBLIC_GAMES_CONFIG.getToken();
+    if (!token) {
+      throw new Error('无法获取权限');
+    }
     this._cache = null;
     const games = await this.getAll();
     const filtered = games.filter(g => g.id !== gameId);
@@ -101,7 +128,7 @@ const publicGames = {
     const res = await fetch(PUBLIC_GAMES_CONFIG.apiUrl, {
       method: 'PATCH',
       headers: {
-        'Authorization': 'Bearer ' + PUBLIC_GAMES_CONFIG.token,
+        'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
         'Accept': 'application/vnd.github+json'
       },
