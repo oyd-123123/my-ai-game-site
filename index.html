@@ -29,6 +29,15 @@
     >
     <button class="btn-save-key" onclick="saveApiKey()">保存</button>
     <span id="apiKeySavedTip" class="saved-tip" style="display:none;">✅ 已保存</span>
+    <input
+      type="password"
+      id="gistTokenInput"
+      placeholder="GitHub Token（发布游戏用）"
+      class="api-key-input"
+      style="width:180px;"
+    >
+    <button class="btn-save-key" style="font-size:0.75rem;padding:8px 10px;" onclick="saveGistToken()">Token</button>
+    <span id="gistTokenSavedTip" class="saved-tip" style="display:none;">✅ 已保存</span>
     <button class="btn-games" onclick="showGamesList()">🎮 游戏列表</button>
     <a href="promo.html" target="_blank"
       style="padding:7px 14px; background:linear-gradient(135deg,rgba(191,0,255,0.2),rgba(0,245,255,0.2)); border:1px solid rgba(191,0,255,0.5); color:#bf00ff; border-radius:6px; font-size:0.82rem; font-weight:bold; text-decoration:none; white-space:nowrap;">
@@ -342,6 +351,18 @@ const STORY_PROMPTS = {
     const tip = document.getElementById('apiKeySavedTip');
     tip.style.display = 'inline';
     setTimeout(() => tip.style.display = 'none', 2000);
+  }
+
+  // ===== GitHub Token（发布游戏用）=====
+  function saveGistToken() {
+    const val = document.getElementById('gistTokenInput').value.trim();
+    if (!val) { alert('请输入 GitHub Token！'); return; }
+    localStorage.setItem('GIST_TOKEN', val);
+    const tip = document.getElementById('gistTokenSavedTip');
+    tip.style.display = 'inline';
+    setTimeout(() => tip.style.display = 'none', 2000);
+    // 立即生效
+    PUBLIC_GAMES_CONFIG._token = val;
   }
 
   // ===== 设置提示词 =====

@@ -14,26 +14,16 @@ const PUBLIC_GAMES_CONFIG = {
     return `https://api.github.com/gists/${this.gistId}`;
   },
 
-  // 从私有 Gist 读取 Token
-  async getToken() {
-    if (this._token) return this._token;
-    try {
-      const res = await fetch(`https://gist.githubusercontent.com/${this.gistOwner}/${this.tokenGistId}/raw/gist-token.js?t=${Date.now()}`);
-      if (!res.ok) throw new Error('token fetch failed');
-      const text = await res.text();
-      const match = text.match(/GIST_TOKEN\s*=\s*['"]([^'"]+)['"]/);
-      if (match) {
-        this._token = match[1];
-        return this._token;
-      }
-    } catch (e) {
-      console.warn('读取 Token 失败', e);
-    }
-    return '';
+  // Token 从页面顶部输入框或 localStorage 读取
+  get token() {
+    return localStorage.getItem('GIST_TOKEN') || '';
   },
 
-  get token() { return this._token; }
-};
+  // 设置 Token
+  setToken(token) {
+    localStorage.setItem('GIST_TOKEN', token);
+    this._token = token;
+  },
 
 const publicGames = {
   _cache: null,
@@ -61,10 +51,11 @@ const publicGames = {
 
   // 发布游戏到公共库（直接写入 Gist）
   async addGame(game) {
-    // 先获取 Token
-    const token = await PUBLIC_GAMES_CONFIG.getToken();
+    const token = PUBLIC_GAMES_CONFIG.token;
     if (!token) {
-      throw new Error('无法获取发布权限，请刷新页面重试');
+      // 没有 Token，跳过发布到公共库，只存本地
+      console.log('无 Gist Token，仅本地保存');
+      return false;
     }
 
     // 先读取最新列表
@@ -117,9 +108,10 @@ const publicGames = {
 
   // 从公共库删除游戏（仅站长用）
   async removeGame(gameId) {
-    const token = await PUBLIC_GAMES_CONFIG.getToken();
+    const token = PUBLIC_GAMES_CONFIG.token;
     if (!token) {
-      throw new Error('无法获取权限');
+      console.log('无 Gist Token，无法删除');
+      return false;
     }
     this._cache = null;
     const games = await this.getAll();
