@@ -117,7 +117,6 @@
         <button class="btn-run" onclick="applyCode()">▶ 应用预览</button>
         <button class="btn-copy" onclick="copyCode()">📋 复制代码</button>
         <button class="btn-save" onclick="showSaveForm()">💾 保存游戏</button>
-        <button class="btn-clear" onclick="clearCode()">🗑 清空</button>
       </div>
     </div>
 
@@ -561,9 +560,9 @@
             </div>
             <div class="game-item-description">${game.description || '无描述'}</div>
             <div class="game-item-actions">
-              <button class="btn-game-action" onclick="loadGame('${game.id}')">加载</button>
-              <button class="btn-game-action" onclick="editGame('${game.id}')">编辑</button>
-              <button class="btn-game-action" onclick="manageVersions('${game.id}')">版本</button>
+              <button class="btn-game-action" onclick="loadGame('${game.id}')">▶ 加载</button>
+              <button class="btn-game-action" onclick="upgradeGame('${game.id}', '${game.name.replace(/'/g,"\\'")}')">⬆️ 升级</button>
+              <button class="btn-game-action" onclick="manageVersions('${game.id}')">📋 版本</button>
             </div>
           `;
           gamesList.appendChild(gameItem);
@@ -611,6 +610,29 @@
     } catch (error) {
       console.error('加载游戏失败', error);
       alert('加载游戏失败: ' + error.message);
+    }
+  }
+
+  // ===== 升级游戏（加载后跳到迭代修改输入框）=====
+  async function upgradeGame(gameId, gameName) {
+    try {
+      const game = await storage.getGame(gameId);
+      if (game) {
+        document.getElementById('codeArea').value = game.code;
+        currentCode = game.code;
+        applyCode();
+        closeGamesList();
+        // 聚焦到 prompt 输入框，提示用户输入升级要求
+        const promptEl = document.getElementById('aiPrompt');
+        if (promptEl) {
+          promptEl.value = '';
+          promptEl.placeholder = `描述对「${gameName}」的升级要求，例如：增加音效、加入排行榜、优化画面...`;
+          promptEl.focus();
+        }
+      }
+    } catch (error) {
+      console.error('升级游戏失败', error);
+      alert('升级游戏失败: ' + error.message);
     }
   }
 
