@@ -41,11 +41,7 @@ async function generateGameByAI(prompt, isModify = false) {
 4. 修改时必须保留原有全部功能，只按用户要求优化或新增。
 5. 代码风格：深色背景，霓虹色调，好看的游戏UI。
 6. 当有参考游戏时，借鉴参考游戏的风格、功能和代码结构，但不要直接复制，而是创造性地融合到新游戏中。
-7. 如果游戏需要调用AI API（如文字冒险、剧情驱动类游戏），必须使用以下配置，不得硬编码其他地址：
-   - API地址：${API_CONFIG.apiUrl}
-   - 模型：${API_CONFIG.endpoint}
-   - API Key：从页面顶部输入框读取，JS代码示例：document.getElementById('apiKeyInput')?.value || localStorage.getItem('LLM_API_KEY') || ''
-   - 如果页面内没有 apiKeyInput 元素，则在游戏页面内自己创建一个 API Key 输入框让用户填写。`
+7. 如果游戏需要调用AI API（如文字冒险、剧情驱动类），直接使用 window.__GAME_API_URL__、window.__GAME_API_MODEL__、window.__GAME_API_KEY__ 这三个全局变量，无需任何输入框。`
     }
   ];
 
@@ -103,6 +99,32 @@ async function generateGameByAI(prompt, isModify = false) {
 
     // 清理markdown代码块
     code = code.replace(/^```html\n?/i, '').replace(/^```\n?/i, '').replace(/\n?```$/i, '').trim();
+
+    // 自动注入 API 配置到生成的游戏代码中
+    // 替换常见的 API 地址占位符，确保游戏直接可用，无需用户再次输入
+    const apiKey = getApiKey();
+    const injectScript = `
+<script id="__api_config__">
+(function(){
+  // 由 GameDev AI 自动注入，无需手动填写
+  window.__GAME_API_URL__ = ${JSON.stringify(API_CONFIG.apiUrl)};
+  window.__GAME_API_MODEL__ = ${JSON.stringify(API_CONFIG.endpoint)};
+  window.__GAME_API_KEY__ = ${JSON.stringify(apiKey)};
+  // 兼容常见变量名
+  window.API_URL = window.__GAME_API_URL__;
+  window.API_MODEL = window.__GAME_API_MODEL__;
+  window.API_KEY = window.__GAME_API_KEY__;
+})();
+<\/script>`;
+
+    // 注入到 <head> 最前面，确保游戏脚本加载前就能读到
+    if (code.includes('<head>')) {
+      code = code.replace('<head>', '<head>' + injectScript);
+    } else if (code.includes('<html>')) {
+      code = code.replace('<html>', '<html>' + injectScript);
+    } else {
+      code = injectScript + code;
+    }
 
     // 更新历史（使用完整 messages 中最后一条 user content，保留参考游戏上下文）
     const lastUserMsg = messages[messages.length - 1];
