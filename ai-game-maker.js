@@ -101,29 +101,27 @@ async function generateGameByAI(prompt, isModify = false) {
     code = code.replace(/^```html\n?/i, '').replace(/^```\n?/i, '').replace(/\n?```$/i, '').trim();
 
     // 自动注入 API 配置到生成的游戏代码中
-    // 替换常见的 API 地址占位符，确保游戏直接可用，无需用户再次输入
     const apiKey = getApiKey();
-    const injectScript = `
-<script id="__api_config__">
-(function(){
-  // 由 GameDev AI 自动注入，无需手动填写
-  window.__GAME_API_URL__ = ${JSON.stringify(API_CONFIG.apiUrl)};
-  window.__GAME_API_MODEL__ = ${JSON.stringify(API_CONFIG.endpoint)};
-  window.__GAME_API_KEY__ = ${JSON.stringify(apiKey)};
-  // 兼容常见变量名
-  window.API_URL = window.__GAME_API_URL__;
-  window.API_MODEL = window.__GAME_API_MODEL__;
-  window.API_KEY = window.__GAME_API_KEY__;
-})();
-<\/script>`;
+    const injectScript = [
+      '<script id="__api_config__">',
+      '(function(){',
+      '  window.__GAME_API_URL__ = ' + JSON.stringify(API_CONFIG.apiUrl) + ';',
+      '  window.__GAME_API_MODEL__ = ' + JSON.stringify(API_CONFIG.endpoint) + ';',
+      '  window.__GAME_API_KEY__ = ' + JSON.stringify(apiKey) + ';',
+      '  window.API_URL = window.__GAME_API_URL__;',
+      '  window.API_MODEL = window.__GAME_API_MODEL__;',
+      '  window.API_KEY = window.__GAME_API_KEY__;',
+      '})();',
+      '<' + '/script>'
+    ].join('\n');
 
-    // 注入到 <head> 最前面，确保游戏脚本加载前就能读到
+    // 注入到 <head> 最前面
     if (code.includes('<head>')) {
-      code = code.replace('<head>', '<head>' + injectScript);
+      code = code.replace('<head>', '<head>\n' + injectScript);
     } else if (code.includes('<html>')) {
-      code = code.replace('<html>', '<html>' + injectScript);
+      code = code.replace('<html>', '<html>\n' + injectScript);
     } else {
-      code = injectScript + code;
+      code = injectScript + '\n' + code;
     }
 
     // 更新历史（使用完整 messages 中最后一条 user content，保留参考游戏上下文）
