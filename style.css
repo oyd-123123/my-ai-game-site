@@ -860,6 +860,27 @@ body::before {
   color: var(--neon-blue);
 }
 
+/* ===== 提示词分组标签 ===== */
+.prompt-section-label {
+  font-size: 0.75rem;
+  color: var(--neon-purple);
+  margin: 10px 0 6px;
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+
+.tag-story {
+  background: rgba(191,0,255,0.07);
+  border-color: rgba(191,0,255,0.3);
+  color: rgba(191,0,255,0.9);
+}
+
+.tag-story:hover {
+  color: var(--neon-purple);
+  border-color: var(--neon-purple);
+  background: rgba(191,0,255,0.15);
+}
+
 /* ===== 游戏搜索 ===== */
 .search-wrap {
   position: relative;
