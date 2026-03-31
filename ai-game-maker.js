@@ -101,7 +101,6 @@ async function generateGameByAI(prompt, isModify = false) {
     code = code.replace(/^```html\n?/i, '').replace(/^```\n?/i, '').replace(/\n?```$/i, '').trim();
 
     // 自动注入 API 配置到生成的游戏代码中
-    const apiKey = getApiKey();
     const injectScript = [
       '<script id="__api_config__">',
       '(function(){',
