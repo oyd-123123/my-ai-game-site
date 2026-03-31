@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>GameDev AI - 宣传片</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; font-family:monospace; }
+canvas { display:block; max-width:100%; }
+.controls { margin-top:16px; display:flex; gap:12px; }
+button {
+  padding:10px 24px; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px;
+}
+.btn-play { background:#00f5ff; color:#000; }
+.btn-record { background:#ff4444; color:#fff; }
+.btn-download { background:#00ff88; color:#000; display:none; }
+.status { color:#888; font-size:13px; margin-top:10px; }
+</style>
+</head>
+<body>
+
+<canvas id="c" width="1280" height="720"></canvas>
+<div class="controls">
+  <button class="btn-play" onclick="togglePlay()">▶ 播放</button>
+  <button class="btn-record" onclick="startRecord()">⏺ 录制视频</button>
+  <button class="btn-download" id="dlBtn">⬇ 下载 WebM</button>
+</div>
+<div class="status" id="status">点击播放预览宣传片 | 点击录制导出 WebM | 下载后用命令转 MP4</div>
+<div style="margin-top:14px; background:#111; border:1px solid #333; border-radius:8px; padding:14px; max-width:700px; text-align:left;">
+  <div style="color:#00f5ff; font-size:13px; margin-bottom:8px; font-weight:bold;">📦 转换为 MP4（下载 WebM 后执行）</div>
+  <code style="color:#a8ff78; font-size:13px; display:block; background:#050510; padding:10px; border-radius:6px;">
+    cd D:\my-ai-game-site<br>
+    python convert_to_mp4.py gamedev-ai-promo.webm
+  </code>
+  <div style="color:#666; font-size:12px; margin-top:8px;">输出文件：gamedev-ai-promo.mp4，保存在同目录</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 1280, H = 720;
+
+let frame = 0;
+let playing = false;
+let animId = null;
+let totalFrames = 60 * 30; // 30秒 @60fps
+
+// ===== 录制相关 =====
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+
+function startRecord() {
+  if (isRecording) return;
+  recordedChunks = [];
+  const stream = canvas.captureStream(60);
+  mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const dlBtn = document.getElementById('dlBtn');
+    dlBtn.style.display = 'inline-block';
+    dlBtn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = url; a.download = 'gamedev-ai-promo.webm'; a.click();
+    };
+    document.getElementById('status').textContent = '✅ 录制完成！点击「下载视频」保存';
+    isRecording = false;
+  };
+  mediaRecorder.start();
+  isRecording = true;
+  frame = 0;
+  playing = true;
+  document.getElementById('status').textContent = '⏺ 录制中... 宣传片播放完毕后自动停止';
+  if (animId) cancelAnimationFrame(animId);
+  loop();
+}
+
+function togglePlay() {
+  if (playing) {
+    playing = false;
+    if (animId) cancelAnimationFrame(animId);
+    document.querySelector('.btn-play').textContent = '▶ 播放';
+  } else {
+    frame = 0;
+    playing = true;
+    document.querySelector('.btn-play').textContent = '⏸ 暂停';
+    loop();
+  }
+}
+
+function loop() {
+  if (!playing) return;
+  drawFrame(frame);
+  frame++;
+  if (frame >= totalFrames) {
+    playing = false;
+    document.querySelector('.btn-play').textContent = '▶ 重播';
+    if (isRecording && mediaRecorder) {
+      mediaRecorder.stop();
+    }
+    return;
+  }
+  animId = requestAnimationFrame(loop);
+}
+
+// ===== 工具函数 =====
+function lerp(a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+function easeInOut(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+function progress(f, start, end) { return Math.max(0, Math.min(1, (f - start) / (end - start))); }
+
+// ===== 粒子系统 =====
+const particles = Array.from({length: 120}, () => ({
+  x: Math.random() * W,
+  y: Math.random() * H,
+  vx: (Math.random() - 0.5) * 0.4,
+  vy: (Math.random() - 0.5) * 0.4,
+  r: Math.random() * 2 + 0.5,
+  alpha: Math.random() * 0.5 + 0.1,
+  color: Math.random() > 0.5 ? '#00f5ff' : '#bf00ff'
+}));
+
+function updateParticles() {
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+    if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+  });
+}
+
+function drawParticles(alpha = 1) {
+  particles.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.alpha * alpha;
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+// ===== 网格背景 =====
+function drawGrid(alpha) {
+  ctx.globalAlpha = alpha * 0.15;
+  ctx.strokeStyle = '#00f5ff';
+  ctx.lineWidth = 0.5;
+  const spacing = 60;
+  for (let x = 0; x < W; x += spacing) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += spacing) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ===== 霓虹文字 =====
+function neonText(text, x, y, size, color, alpha, blur = 20) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = `bold ${size}px 'Segoe UI', monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = color;
+  ctx.shadowBlur = blur;
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+  ctx.shadowBlur = blur * 2;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// ===== 打字机效果 =====
+function typeText(text, x, y, size, color, alpha, charCount) {
+  const shown = text.slice(0, Math.floor(charCount));
+  neonText(shown + (charCount < text.length ? '|' : ''), x, y, size, color, alpha);
+}
+
+// ===== 场景定义 =====
+// 场景1: 0-300帧 (0-5s) - 开场 Logo
+// 场景2: 300-600帧 (5-10s) - AI生成展示
+// 场景3: 600-900帧 (10-15s) - 迭代修改展示
+// 场景4: 900-1200帧 (15-20s) - 内置游戏展示
+// 场景5: 1200-1500帧 (20-25s) - 功能列表
+// 场景6: 1500-1800帧 (25-30s) - 结尾CTA
+
+function drawFrame(f) {
+  updateParticles();
+
+  // 背景
+  ctx.fillStyle = '#050510';
+  ctx.fillRect(0, 0, W, H);
+  drawGrid(1);
+  drawParticles(1);
+
+  // ===== 场景1: 开场 Logo (0-300) =====
+  if (f < 300) {
+    const p1 = progress(f, 0, 60);
+    const p2 = progress(f, 60, 180);
+    const p3 = progress(f, 180, 280);
+    const fadeOut = 1 - progress(f, 260, 300);
+
+    // 光圈扩散
+    const ringAlpha = easeOut(p1) * (1 - p1 * 0.3);
+    for (let i = 0; i < 3; i++) {
+      const r = easeOut(p1) * (300 + i * 80);
+      ctx.beginPath();
+      ctx.arc(W/2, H/2, r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(0,245,255,${ringAlpha * (0.4 - i * 0.1)})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // GAMEDEV 主标题
+    const titleAlpha = easeOut(p2) * fadeOut;
+    ctx.save();
+    ctx.globalAlpha = titleAlpha;
+    const scale = 0.5 + easeOut(p2) * 0.5;
+    ctx.translate(W/2, H/2 - 40);
+    ctx.scale(scale, scale);
+    ctx.translate(-W/2, -(H/2 - 40));
+    neonText('GAMEDEV', W/2 - 120, H/2 - 40, 110, '#00f5ff', 1, 30);
+    neonText('.AI', W/2 + 200, H/2 - 40, 110, '#bf00ff', 1, 30);
+    ctx.restore();
+
+    // 副标题打字机
+    const subAlpha = easeOut(p3) * fadeOut;
+    const charCount = easeOut(p3) * 22;
+    typeText('AI驱动的游戏生成平台', W/2, H/2 + 80, 32, '#e0e0ff', subAlpha, charCount);
+
+    // 底部光线
+    const lineAlpha = easeOut(p2) * fadeOut;
+    const grad = ctx.createLinearGradient(W/2 - 400, 0, W/2 + 400, 0);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(0.5, `rgba(0,245,255,${lineAlpha * 0.8})`);
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(W/2 - 400, H/2 + 120, 800, 1);
+  }
+
+  // ===== 场景2: AI生成展示 (300-600) =====
+  if (f >= 280 && f < 600) {
+    const fadeIn = progress(f, 280, 340);
+    const fadeOut = 1 - progress(f, 560, 600);
+    const alpha = Math.min(fadeIn, fadeOut);
+
+    // 标题
+    neonText('🤖 AI 游戏生成器', W/2, 100, 42, '#00f5ff', alpha * easeOut(progress(f, 300, 380)));
+
+    // 模拟输入框
+    const boxAlpha = alpha * easeOut(progress(f, 340, 420));
+    ctx.save();
+    ctx.globalAlpha = boxAlpha;
+    // 输入框背景
+    ctx.fillStyle = '#0f0f2a';
+    ctx.strokeStyle = 'rgba(0,245,255,0.4)';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, W/2 - 380, 160, 760, 80, 10);
+    ctx.fill(); ctx.stroke();
+    // 输入文字打字机
+    const inputChars = progress(f, 360, 500) * 20;
+    ctx.fillStyle = '#e0e0ff';
+    ctx.font = '22px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('> ' + '太空射击游戏，方向键控制飞船...'.slice(0, Math.floor(inputChars)), W/2 - 360, 208);
+    ctx.restore();
+
+    // 生成按钮
+    const btnAlpha = alpha * easeOut(progress(f, 460, 520));
+    ctx.save();
+    ctx.globalAlpha = btnAlpha;
+    const btnGrad = ctx.createLinearGradient(W/2 - 100, 0, W/2 + 100, 0);
+    btnGrad.addColorStop(0, '#00f5ff');
+    btnGrad.addColorStop(1, '#bf00ff');
+    ctx.fillStyle = btnGrad;
+    roundRect(ctx, W/2 - 100, 270, 200, 50, 8);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 20px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('🚀 生成游戏', W/2, 302);
+    ctx.restore();
+
+    // 代码生成动画
+    const codeAlpha = alpha * easeOut(progress(f, 500, 560));
+    const codeLines = [
+      'const canvas = document.getElementById("c");',
+      'const ctx = canvas.getContext("2d");',
+      'let player = { x: 400, y: 500, speed: 5 };',
+      'let bullets = [], enemies = [], score = 0;',
+      'function gameLoop() { update(); draw(); }',
+      'requestAnimationFrame(gameLoop);',
+    ];
+    ctx.save();
+    ctx.globalAlpha = codeAlpha;
+    ctx.fillStyle = '#050510';
+    ctx.strokeStyle = 'rgba(0,255,136,0.3)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, W/2 - 380, 350, 760, 200, 10);
+    ctx.fill(); ctx.stroke();
+    const codeProgress = progress(f, 510, 580);
+    codeLines.slice(0, Math.ceil(codeProgress * codeLines.length)).forEach((line, i) => {
+      ctx.fillStyle = i % 2 === 0 ? '#a8ff78' : '#79c0ff';
+      ctx.font = '16px Courier New, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(line, W/2 - 360, 385 + i * 28);
+    });
+    ctx.restore();
+  }
+
+  // ===== 场景3: 迭代修改 (600-900) =====
+  if (f >= 580 && f < 900) {
+    const fadeIn = progress(f, 580, 640);
+    const fadeOut = 1 - progress(f, 860, 900);
+    const alpha = Math.min(fadeIn, fadeOut);
+
+    neonText('🔁 多轮迭代修改', W/2, 100, 42, '#00ff88', alpha * easeOut(progress(f, 600, 680)));
+
+    // 对话气泡序列
+    const bubbles = [
+      { role: 'user', text: '生成一个打砖块游戏', frame: 640 },
+      { role: 'ai',   text: '✅ 已生成！包含挡板、砖块、得分...', frame: 700 },
+      { role: 'user', text: '加快球速，增加生命值显示', frame: 760 },
+      { role: 'ai',   text: '✅ 已修改！球速+30%，生命值❤❤❤', frame: 820 },
+    ];
+
+    bubbles.forEach((b, i) => {
+      const bAlpha = alpha * easeOut(progress(f, b.frame, b.frame + 40));
+      if (bAlpha <= 0) return;
+      const isUser = b.role === 'user';
+      const y = 180 + i * 110;
+      const x = isUser ? W/2 - 300 : W/2 - 100;
+      const w = 560;
+
+      ctx.save();
+      ctx.globalAlpha = bAlpha;
+      ctx.fillStyle = isUser ? '#1a1a3e' : '#0a2a1a';
+      ctx.strokeStyle = isUser ? 'rgba(0,245,255,0.4)' : 'rgba(0,255,136,0.4)';
+      ctx.lineWidth = 1;
+      roundRect(ctx, x, y, w, 70, 10);
+      ctx.fill(); ctx.stroke();
+
+      ctx.fillStyle = isUser ? '#00f5ff' : '#00ff88';
+      ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(isUser ? '👤 用户' : '🤖 AI', x + 14, y + 22);
+
+      ctx.fillStyle = '#e0e0ff';
+      ctx.font = '17px monospace';
+      ctx.fillText(b.text, x + 14, y + 50);
+      ctx.restore();
+    });
+
+    // 右侧"AI记住上下文"标注
+    const tagAlpha = alpha * easeOut(progress(f, 820, 870));
+    ctx.save();
+    ctx.globalAlpha = tagAlpha;
+    ctx.fillStyle = 'rgba(0,255,136,0.1)';
+    ctx.strokeStyle = 'rgba(0,255,136,0.5)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, W/2 + 280, 300, 260, 60, 8);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 15px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('🧠 AI记住上下文', W/2 + 410, 325);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '13px monospace';
+    ctx.fillText('每次修改保留历史', W/2 + 410, 348);
+    ctx.restore();
+  }
+
+  // ===== 场景4: 内置游戏展示 (900-1200) =====
+  if (f >= 880 && f < 1200) {
+    const fadeIn = progress(f, 880, 940);
+    const fadeOut = 1 - progress(f, 1160, 1200);
+    const alpha = Math.min(fadeIn, fadeOut);
+
+    neonText('🎮 内置太空收集者', W/2, 100, 42, '#bf00ff', alpha * easeOut(progress(f, 900, 980)));
+
+    // 模拟游戏画面
+    const gameAlpha = alpha * easeOut(progress(f, 940, 1000));
+    ctx.save();
+    ctx.globalAlpha = gameAlpha;
+
+    // 游戏框
+    ctx.fillStyle = '#0a0a1a';
+    ctx.strokeStyle = 'rgba(0,245,255,0.4)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, W/2 - 320, 140, 640, 420, 12);
+    ctx.fill(); ctx.stroke();
+
+    // 背景星点
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    for (let i = 0; i < 40; i++) {
+      ctx.fillRect(((i * 137 + f * 0.5) % 620) + W/2 - 310, ((i * 97 + f * 0.3) % 400) + 150, 1, 1);
+    }
+
+    // 玩家飞船（动态移动）
+    const px = W/2 + Math.sin(f * 0.04) * 150;
+    const py = 480;
+    ctx.shadowColor = '#00f5ff'; ctx.shadowBlur = 15;
+    ctx.fillStyle = '#00f5ff';
+    ctx.beginPath();
+    ctx.moveTo(px, py - 20); ctx.lineTo(px + 18, py + 20);
+    ctx.lineTo(px, py + 10); ctx.lineTo(px - 18, py + 20);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 星星收集物
+    for (let i = 0; i < 5; i++) {
+      const sx = W/2 - 250 + i * 130;
+      const sy = 220 + Math.sin(f * 0.05 + i) * 20;
+      const pulse = Math.sin(f * 0.08 + i) * 3;
+      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 12 + pulse);
+      grad.addColorStop(0, `hsl(${40 + i * 15}, 100%, 60%)`);
+      grad.addColorStop(1, 'transparent');
+      ctx.beginPath(); ctx.arc(sx, sy, 12 + pulse, 0, Math.PI * 2);
+      ctx.fillStyle = grad; ctx.fill();
+    }
+
+    // 敌人
+    for (let i = 0; i < 3; i++) {
+      const ex = W/2 - 180 + i * 180;
+      const ey = 300 + ((f * 1.5 + i * 80) % 200);
+      ctx.fillStyle = '#ff4444'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 8;
+      ctx.fillRect(ex - 14, ey - 14, 28, 28); ctx.shadowBlur = 0;
+    }
+
+    // HUD
+    ctx.fillStyle = '#00f5ff'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('分数: ' + (f - 900) * 2, W/2 - 310, 170);
+    ctx.fillStyle = '#ff6666';
+    ctx.fillText('❤ ❤ ❤', W/2 + 200, 170);
+
+    ctx.restore();
+
+    // 控制说明
+    const ctrlAlpha = alpha * easeOut(progress(f, 1060, 1120));
+    neonText('⌨️ 方向键移动  |  收集星星  |  躲避敌人', W/2, 600, 22, '#8888aa', ctrlAlpha, 8);
+  }
+
+  // ===== 场景5: 功能列表 (1200-1500) =====
+  if (f >= 1180 && f < 1500) {
+    const fadeIn = progress(f, 1180, 1240);
+    const fadeOut = 1 - progress(f, 1460, 1500);
+    const alpha = Math.min(fadeIn, fadeOut);
+
+    neonText('✨ 全部功能', W/2, 90, 46, '#00f5ff', alpha * easeOut(progress(f, 1200, 1260)));
+
+    const features = [
+      { icon: '🤖', title: 'AI 游戏生成', desc: '自然语言描述，一键生成完整游戏代码', color: '#00f5ff', frame: 1240 },
+      { icon: '🔁', title: '多轮迭代修改', desc: 'AI记住上下文，反复优化，像Trae一样', color: '#00ff88', frame: 1290 },
+      { icon: '🎮', title: '内置经典游戏', desc: '太空收集者，可直接玩，也可AI优化', color: '#bf00ff', frame: 1340 },
+      { icon: '📝', title: '代码编辑器', desc: '查看/修改生成代码，实时预览效果', color: '#ff8c00', frame: 1390 },
+      { icon: '⚡', title: '零框架依赖', desc: '纯原生HTML5+JS，轻量快速', color: '#ffff00', frame: 1430 },
+    ];
+
+    features.forEach((feat, i) => {
+      const fAlpha = alpha * easeOut(progress(f, feat.frame, feat.frame + 40));
+      if (fAlpha <= 0) return;
+
+      const col = i % 3;
+      const row = Math.floor(i / 3);
+      const x = W/2 - 500 + col * 340;
+      const y = 150 + row * 180;
+
+      ctx.save();
+      ctx.globalAlpha = fAlpha;
+      ctx.fillStyle = '#0f0f2a';
+      ctx.strokeStyle = feat.color + '44';
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, x, y, 300, 140, 10);
+      ctx.fill(); ctx.stroke();
+
+      ctx.font = '36px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(feat.icon, x + 16, y + 50);
+
+      ctx.fillStyle = feat.color;
+      ctx.font = 'bold 18px monospace';
+      ctx.fillText(feat.title, x + 60, y + 42);
+
+      ctx.fillStyle = '#8888aa';
+      ctx.font = '14px monospace';
+      // 自动换行
+      const words = feat.desc;
+      ctx.fillText(words.slice(0, 18), x + 16, y + 80);
+      ctx.fillText(words.slice(18), x + 16, y + 100);
+      ctx.restore();
+    });
+  }
+
+  // ===== 场景6: 结尾CTA (1500-1800) =====
+  if (f >= 1480) {
+    const fadeIn = progress(f, 1480, 1560);
+    const alpha = easeOut(fadeIn);
+
+    // 光晕背景
+    const radGrad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, 500);
+    radGrad.addColorStop(0, `rgba(0,245,255,${alpha * 0.08})`);
+    radGrad.addColorStop(0.5, `rgba(191,0,255,${alpha * 0.05})`);
+    radGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = radGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 主标题
+    const titleAlpha = alpha * easeOut(progress(f, 1520, 1600));
+    ctx.save();
+    ctx.globalAlpha = titleAlpha;
+    ctx.font = 'bold 90px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const grad = ctx.createLinearGradient(W/2 - 300, 0, W/2 + 300, 0);
+    grad.addColorStop(0, '#00f5ff');
+    grad.addColorStop(0.5, '#ffffff');
+    grad.addColorStop(1, '#bf00ff');
+    ctx.fillStyle = grad;
+    ctx.shadowColor = '#00f5ff';
+    ctx.shadowBlur = 40;
+    ctx.fillText('GAMEDEV.AI', W/2, H/2 - 80);
+    ctx.restore();
+
+    // 副标题
+    const subAlpha = alpha * easeOut(progress(f, 1580, 1650));
+    neonText('用 AI 生成你的游戏', W/2, H/2 + 20, 36, '#e0e0ff', subAlpha, 15);
+
+    // 访问地址
+    const urlAlpha = alpha * easeOut(progress(f, 1640, 1700));
+    neonText('http://127.0.0.1:9090', W/2, H/2 + 100, 28, '#00f5ff', urlAlpha, 20);
+
+    // 底部光线
+    const lineAlpha = alpha * easeOut(progress(f, 1700, 1760));
+    const lineGrad = ctx.createLinearGradient(W/2 - 500, 0, W/2 + 500, 0);
+    lineGrad.addColorStop(0, 'transparent');
+    lineGrad.addColorStop(0.3, `rgba(0,245,255,${lineAlpha})`);
+    lineGrad.addColorStop(0.7, `rgba(191,0,255,${lineAlpha})`);
+    lineGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = lineGrad;
+    ctx.fillRect(W/2 - 500, H/2 + 150, 1000, 2);
+
+    // 闪烁粒子爆炸
+    if (f > 1600) {
+      const burstProgress = progress(f, 1600, 1800);
+      for (let i = 0; i < 20; i++) {
+        const angle = (i / 20) * Math.PI * 2 + f * 0.01;
+        const r = burstProgress * 350;
+        const px = W/2 + Math.cos(angle) * r;
+        const py = H/2 + Math.sin(angle) * r * 0.4;
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fillStyle = i % 2 === 0 ? '#00f5ff' : '#bf00ff';
+        ctx.globalAlpha = (1 - burstProgress) * alpha;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // 帧数/进度条
+  ctx.fillStyle = 'rgba(0,245,255,0.3)';
+  ctx.fillRect(0, H - 3, (f / totalFrames) * W, 3);
+}
+
+// ===== 圆角矩形工具 =====
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// 初始绘制第一帧
+drawFrame(0);
+</script>
+</body>
+</html>

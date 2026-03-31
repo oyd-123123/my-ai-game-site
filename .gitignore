@@ -1,0 +1,10 @@
+# 大文件/工具
+cloudflared.exe
+ngrok.zip
+*.mp4
+
+# 临时文件
+*.txt
+__pycache__/
+*.pyc
+.trae/

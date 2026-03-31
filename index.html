@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GameDev AI - 可视化AI游戏生成器</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- 加载遮罩 -->
+<div class="loading-overlay" id="loadingIndicator">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">🤖 AI正在生成游戏代码...</div>
+</div>
+
+<!-- ===== 顶部导航 ===== -->
+<header class="site-header">
+  <div class="header-left">
+    <div class="site-logo">GAME<span>DEV</span>.AI</div>
+    <p class="site-desc">AI生成网页游戏 · 多轮迭代修改 · 内置经典游戏 · 在线编辑预览</p>
+  </div>
+  <div class="header-right">
+    <input
+      type="password"
+      id="apiKeyInput"
+      placeholder="输入 API Key（自动保存）"
+      class="api-key-input"
+    >
+    <button class="btn-save-key" onclick="saveApiKey()">保存</button>
+    <span id="apiKeySavedTip" class="saved-tip" style="display:none;">✅ 已保存</span>
+    <button class="btn-games" onclick="showGamesList()">🎮 游戏列表</button>
+    <a href="promo.html" target="_blank"
+      style="padding:7px 14px; background:linear-gradient(135deg,rgba(191,0,255,0.2),rgba(0,245,255,0.2)); border:1px solid rgba(191,0,255,0.5); color:#bf00ff; border-radius:6px; font-size:0.82rem; font-weight:bold; text-decoration:none; white-space:nowrap;">
+      🎬 宣传片
+    </a>
+  </div>
+</header>
+
+<!-- ===== 主体布局 ===== -->
+<div class="main-layout">
+
+  <!-- ===== 左侧控制面板 ===== -->
+  <aside class="sidebar">
+
+    <!-- AI 生成器 -->
+    <div class="panel">
+      <div class="panel-title">🤖 AI 游戏生成器</div>
+      <textarea
+        id="aiPrompt"
+        class="textarea-input"
+        placeholder="描述你想要的游戏，例如：&#10;• 2D横版跳跃，收集金币&#10;• 打飞机，空格键射击&#10;• 贪吃蛇，方向键控制&#10;• 打砖块，鼠标控制挡板"
+        rows="5"
+      ></textarea>
+      <div class="prompt-tags">
+        <span class="tag" onclick="setPrompt('太空射击游戏，方向键控制飞船，空格键射击，击落陨石得分，有生命值')">太空射击</span>
+        <span class="tag" onclick="setPrompt('打砖块游戏，鼠标控制挡板，多种颜色砖块，有得分和关卡')">打砖块</span>
+        <span class="tag" onclick="setPrompt('贪吃蛇游戏，方向键控制，吃食物变长，有最高分记录')">贪吃蛇</span>
+        <span class="tag" onclick="setPrompt('2D平台跳跃游戏，左右移动加跳跃，收集金币，有障碍物')">平台跳跃</span>
+        <span class="tag" onclick="setPrompt('俄罗斯方块，方向键控制，有得分和等级提升')">俄罗斯方块</span>
+        <span class="tag" onclick="setPrompt('迷宫游戏，方向键走迷宫，找到出口，有计时器')">迷宫</span>
+      </div>
+      <div class="form-group">
+        <label for="referenceGame" style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 6px; display: block;">参考游戏（可选）:</label>
+        <select id="referenceGame" class="form-input" style="font-size: 0.8rem;">
+          <option value="">无参考游戏</option>
+        </select>
+        <p class="panel-hint" style="font-size: 0.75rem;">选择一个已保存的游戏作为参考，AI会借鉴其风格和功能</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn-primary" onclick="handleGenerate()">🚀 生成游戏</button>
+        <button class="btn-secondary" onclick="handleModify()">🔁 迭代修改</button>
+        <button class="btn-danger" onclick="handleReset()">🔄 重置记忆</button>
+      </div>
+    </div>
+
+    <!-- 内置游戏 -->
+    <div class="panel">
+      <div class="panel-title">🎯 内置游戏</div>
+      <p class="panel-desc">太空收集者 - 原生JS经典小游戏</p>
+      <button class="btn-builtin" onclick="loadBuiltIn()">🚀 加载太空收集者</button>
+      <p class="panel-hint">加载后可让AI继续优化这个游戏</p>
+    </div>
+
+    <!-- 代码编辑器 -->
+    <div class="panel">
+      <div class="panel-title">📝 代码编辑器</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div style="font-size: 0.75rem; color: var(--text-dim);">自动保存: <span id="autoSaveStatus" style="color: var(--neon-green);">已启用</span></div>
+        <div style="font-size: 0.75rem; color: var(--text-dim);" id="lastSaveTime">上次保存: 从未</div>
+      </div>
+      <textarea
+        id="codeArea"
+        class="code-editor"
+        placeholder="// AI生成的游戏代码会显示在这里&#10;// 你也可以直接手动修改代码&#10;// 修改后点「应用预览」查看效果"
+        rows="14"
+        spellcheck="false"
+      ></textarea>
+      <div class="btn-group">
+        <button class="btn-run" onclick="applyCode()">▶ 应用预览</button>
+        <button class="btn-copy" onclick="copyCode()">📋 复制代码</button>
+        <button class="btn-save" onclick="showSaveForm()">💾 保存游戏</button>
+        <button class="btn-clear" onclick="clearCode()">🗑 清空</button>
+      </div>
+    </div>
+
+    <!-- 修改历史 -->
+    <div class="panel">
+      <div class="panel-title">📜 修改历史 <span id="historyCount" class="badge">0</span></div>
+      <div id="historyLog" class="history-log">
+        <p class="empty-hint">暂无记录，点击历史可重新填入</p>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ===== 右侧预览区 ===== -->
+  <main class="preview-area">
+    <div class="preview-header">
+      <div class="preview-title">🕹️ 游戏预览</div>
+      <div class="preview-actions">
+        <button class="btn-fullscreen" onclick="toggleFullscreen()">⛶ 全屏</button>
+        <span id="previewStatus" class="preview-status">等待生成...</span>
+      </div>
+    </div>
+    <div class="preview-container">
+      <iframe
+        id="gameFrame"
+        class="game-frame"
+        frameborder="0"
+        sandbox="allow-scripts allow-same-origin"
+      ></iframe>
+      <div class="preview-placeholder" id="previewPlaceholder">
+        <div class="placeholder-icon">🎮</div>
+        <div class="placeholder-text">在左侧输入游戏描述<br>点击「生成游戏」开始</div>
+        <div class="placeholder-hint">或点击「加载太空收集者」体验内置游戏</div>
+      </div>
+    </div>
+    <div class="preview-footer">
+      点击预览区域后使用键盘/鼠标控制游戏 &nbsp;|&nbsp; 支持多轮迭代修改，AI会记住上下文
+    </div>
+  </main>
+
+</div>
+
+<!-- 保存游戏表单 -->
+<div class="modal" id="saveModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>💾 保存游戏</h3>
+      <button class="close-btn" onclick="closeSaveForm()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="gameName">游戏名称:</label>
+        <input type="text" id="gameName" class="form-input" placeholder="输入游戏名称">
+      </div>
+      <div class="form-group">
+        <label for="gameDescription">游戏描述:</label>
+        <textarea id="gameDescription" class="form-textarea" rows="3" placeholder="输入游戏描述"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeSaveForm()">取消</button>
+      <button class="btn-primary" onclick="saveGame()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 游戏列表模态框 -->
+<div class="modal" id="gamesListModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>🎮 我的游戏</h3>
+      <button class="close-btn" onclick="closeGamesList()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="gamesList" class="games-list">
+        <p class="empty-hint">暂无保存的游戏</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="exportGames()">💾 导出游戏</button>
+      <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importGames(event)">
+      <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📁 导入游戏</button>
+      <button class="btn-secondary" onclick="restoreFromCloud()">☁️ 从云端恢复</button>
+      <button class="btn-secondary" onclick="showStorageStatus()">💿 存储状态</button>
+      <button class="btn-primary" onclick="showFusionForm()">🔄 融合游戏</button>
+      <button class="btn-secondary" onclick="closeGamesList()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 版本管理模态框 -->
+<div class="modal" id="versionsModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>📋 版本管理</h3>
+      <button class="close-btn" onclick="closeVersionsModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <h4 id="versionGameName" style="color: var(--neon-blue); margin-bottom: 16px;"></h4>
+      <div id="versionsList" class="versions-list">
+        <p class="empty-hint">暂无版本记录</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeVersionsModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 游戏融合模态框 -->
+<div class="modal" id="fusionModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>🔄 游戏融合</h3>
+      <button class="close-btn" onclick="closeFusionForm()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="color: var(--text-dim); margin-bottom: 16px;">选择多个游戏进行融合，AI会生成一个包含所有游戏特点的新游戏</p>
+      <div id="fusionGamesList" class="fusion-games-list">
+        <p class="empty-hint">暂无游戏可选择</p>
+      </div>
+      <div class="form-group" style="margin-top: 20px;">
+        <label for="fusionPrompt" style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 6px; display: block;">融合提示（可选）:</label>
+        <textarea id="fusionPrompt" class="form-textarea" rows="3" placeholder="描述你希望如何融合这些游戏，例如：将游戏A的玩法与游戏B的视觉风格相结合"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeFusionForm()">取消</button>
+      <button class="btn-primary" onclick="fuseGames()">融合游戏</button>
+    </div>
+  </div>
+</div>
+
+<!-- 存储状态模态框 -->
+<div class="modal" id="storageStatusModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>💿 存储状态</h3>
+      <button class="close-btn" onclick="closeStorageStatus()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="storageStatusContent" style="padding: 20px; background: var(--bg); border-radius: 8px;">
+        <div style="margin-bottom: 20px;">
+          <div style="font-size: 1rem; color: var(--neon-blue); margin-bottom: 12px; font-weight: bold;">📱 本地存储</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <div>
+              <div style="font-size: 0.9rem; color: var(--text-dim);">游戏数量:</div>
+              <div id="storageGameCount" style="font-size: 1.5rem; color: var(--neon-blue); font-weight: bold;">0</div>
+            </div>
+            <div>
+              <div style="font-size: 0.9rem; color: var(--text-dim);">存储大小:</div>
+              <div id="storageSize" style="font-size: 1.5rem; color: var(--neon-green); font-weight: bold;">0 MB</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="border-top: 1px solid var(--border); padding-top: 20px;">
+          <div style="font-size: 1rem; color: var(--neon-purple); margin-bottom: 12px; font-weight: bold;">☁️ OpenClaw云端</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <div>
+              <div style="font-size: 0.9rem; color: var(--text-dim);">云端游戏:</div>
+              <div id="cloudGameCount" style="font-size: 1.5rem; color: var(--neon-purple); font-weight: bold;">0</div>
+            </div>
+            <div>
+              <div style="font-size: 0.9rem; color: var(--text-dim);">同步状态:</div>
+              <div id="cloudSyncStatus" style="font-size: 1rem; color: var(--text-dim);">未连接</div>
+            </div>
+          </div>
+          <div style="margin-top: 8px;">
+            <div style="font-size: 0.8rem; color: var(--text-dim);">上次同步: <span id="lastCloudSync">从未</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeStorageStatus()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 页脚 ===== -->
+<footer class="site-footer">
+  <span>GAMEDEV.AI</span> · AI驱动游戏生成 · 多轮迭代 · 原生JS + Canvas · 无框架依赖
+</footer>
+
+<script src="config.js"></script>
+<script src="storage.js"></script>
+<script src="inject-games.js"></script>
+<script src="openclaw-storage.js"></script>
+<script src="ai-game-maker.js"></script>
+<script>
+
+  // ===== API Key =====
+  function saveApiKey() {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    if (!val) { alert('请输入 API Key！'); return; }
+    localStorage.setItem('LLM_API_KEY', val);
+    const tip = document.getElementById('apiKeySavedTip');
+    tip.style.display = 'inline';
+    setTimeout(() => tip.style.display = 'none', 2000);
+  }
+
+  // ===== 设置提示词 =====
+  function setPrompt(text) {
+    document.getElementById('aiPrompt').value = text;
+    document.getElementById('aiPrompt').focus();
+  }
+
+  // ===== 更新参考游戏列表 =====
+  async function updateReferenceGames() {
+    const select = document.getElementById('referenceGame');
+    
+    try {
+      // 从IndexedDB获取游戏
+      const games = await storage.getAllGames();
+      
+      // 清空现有选项（保留第一个默认选项）
+      while (select.options.length > 1) {
+        select.remove(1);
+      }
+      
+      // 添加游戏选项
+      games.forEach(game => {
+        const option = document.createElement('option');
+        option.value = game.id;
+        option.textContent = game.name;
+        select.appendChild(option);
+      });
+    } catch (error) {
+      console.error('更新参考游戏列表失败', error);
+    }
+  }
+
+  // ===== 生成游戏 =====
+  async function handleGenerate() {
+    const prompt = document.getElementById('aiPrompt').value.trim();
+    if (!prompt) { alert('请输入游戏描述！'); return; }
+    const code = await generateGameByAI(prompt, false);
+    if (code) {
+      document.getElementById('codeArea').value = code;
+      applyCode();
+      updateHistoryCount();
+    }
+  }
+
+  // ===== 迭代修改 =====
+  async function handleModify() {
+    const prompt = document.getElementById('aiPrompt').value.trim();
+    if (!prompt) { alert('请输入修改要求！'); return; }
+    if (!currentCode) { alert('请先生成一个游戏再进行修改！'); return; }
+    const code = await generateGameByAI(prompt, true);
+    if (code) {
+      document.getElementById('codeArea').value = code;
+      applyCode();
+      updateHistoryCount();
+    }
+  }
+
+  // ===== 重置AI记忆 =====
+  function handleReset() {
+    if (!confirm('确定要清空AI记忆吗？这会重置所有对话历史。')) return;
+    resetGameGenerator();
+    document.getElementById('historyCount').textContent = '0';
+    setPreviewStatus('已重置');
+  }
+
+  // ===== 加载内置游戏 =====
+  function loadBuiltIn() {
+    const code = getBuiltInGameCode();
+    document.getElementById('codeArea').value = code;
+    currentCode = code;
+    applyCode();
+    addHistoryItem('🎯 内置', '太空收集者游戏');
+    updateHistoryCount();
+  }
+
+  // ===== 应用代码到预览 =====
+  function applyCode() {
+    const code = document.getElementById('codeArea').value.trim();
+    if (!code) { alert('代码为空！'); return; }
+    const frame = document.getElementById('gameFrame');
+    const placeholder = document.getElementById('previewPlaceholder');
+    frame.srcdoc = code;
+    placeholder.style.display = 'none';
+    frame.style.display = 'block';
+    setPreviewStatus('运行中 ✅');
+  }
+
+  // ===== 复制代码 =====
+  function copyCode() {
+    const code = document.getElementById('codeArea').value;
+    if (!code) { alert('没有代码可复制！'); return; }
+    navigator.clipboard.writeText(code).then(() => {
+      const btn = event.target;
+      btn.textContent = '✅ 已复制';
+      setTimeout(() => btn.textContent = '📋 复制代码', 2000);
+    });
+  }
+
+  // ===== 清空代码 =====
+  function clearCode() {
+    if (!confirm('确定清空代码编辑器？')) return;
+    document.getElementById('codeArea').value = '';
+  }
+
+  // ===== 全屏预览 =====
+  function toggleFullscreen() {
+    const frame = document.getElementById('gameFrame');
+    if (frame.requestFullscreen) frame.requestFullscreen();
+    else if (frame.webkitRequestFullscreen) frame.webkitRequestFullscreen();
+  }
+
+  // ===== 状态更新 =====
+  function setPreviewStatus(text) {
+    document.getElementById('previewStatus').textContent = text;
+  }
+
+  function updateHistoryCount() {
+    document.getElementById('historyCount').textContent = Math.floor(gameHistory.length / 2);
+  }
+
+  // ===== 游戏存储功能 =====
+  function showSaveForm() {
+    const modal = document.getElementById('saveModal');
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('show'), 10);
+  }
+
+  function closeSaveForm() {
+    const modal = document.getElementById('saveModal');
+    modal.classList.remove('show');
+    setTimeout(() => modal.style.display = 'none', 300);
+  }
+
+  async function saveGame() {
+    const name = document.getElementById('gameName').value.trim();
+    const description = document.getElementById('gameDescription').value.trim();
+    const code = document.getElementById('codeArea').value.trim();
+
+    if (!name) {
+      alert('请输入游戏名称！');
+      return;
+    }
+
+    if (!code) {
+      alert('没有游戏代码可保存！');
+      return;
+    }
+
+    try {
+      // 从IndexedDB获取现有游戏
+      const games = await storage.getAllGames();
+      
+      // 检查是否已存在同名游戏
+      const existingGame = games.find(g => g.name === name);
+      
+      let savedGame;
+      
+      if (existingGame) {
+        // 创建新版本
+        const newVersion = {
+          id: Date.now().toString(),
+          code: code,
+          createdAt: new Date().toISOString()
+        };
+        existingGame.versions.push(newVersion);
+        existingGame.code = code; // 更新最新代码
+        existingGame.updatedAt = new Date().toISOString();
+        
+        // 保存更新后的游戏
+        await storage.saveGame(existingGame);
+        savedGame = existingGame;
+        alert('游戏新版本保存成功！');
+      } else {
+        // 创建新游戏
+        const game = {
+          id: Date.now().toString(),
+          name: name,
+          description: description,
+          code: code,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          versions: [{
+            id: Date.now().toString(),
+            code: code,
+            createdAt: new Date().toISOString()
+          }]
+        };
+
+        // 保存新游戏
+        await storage.saveGame(game);
+        savedGame = game;
+        alert('游戏保存成功！');
+      }
+
+      // 同步到OpenClaw云端
+      if (typeof openclawStorage !== 'undefined') {
+        console.log('正在同步到OpenClaw云端...');
+        const syncResult = await openclawStorage.saveGameToCloud(savedGame);
+        if (syncResult.success) {
+          console.log('云端同步成功');
+        } else {
+          console.log('云端同步失败:', syncResult.error);
+        }
+      }
+
+      closeSaveForm();
+
+      // 清空表单
+      document.getElementById('gameName').value = '';
+      document.getElementById('gameDescription').value = '';
+
+      // 更新参考游戏列表
+      updateReferenceGames();
+    } catch (error) {
+      console.error('保存游戏失败', error);
+      alert('保存游戏失败: ' + error.message);
+    }
+  }
+
+  // ===== 游戏列表功能 =====
+  async function showGamesList() {
+    const modal = document.getElementById('gamesListModal');
+    const gamesList = document.getElementById('gamesList');
+    
+    try {
+      // 从IndexedDB获取游戏
+      const games = await storage.getAllGames();
+      
+      if (games.length === 0) {
+        gamesList.innerHTML = '<p class="empty-hint">暂无保存的游戏</p>';
+      } else {
+        gamesList.innerHTML = '';
+        games.forEach(game => {
+          const gameItem = document.createElement('div');
+          gameItem.className = 'game-item';
+          gameItem.innerHTML = `
+            <div class="game-item-header">
+              <div class="game-item-title">${game.name}</div>
+              <div class="game-item-date">${new Date(game.createdAt).toLocaleString()}</div>
+            </div>
+            <div class="game-item-description">${game.description || '无描述'}</div>
+            <div class="game-item-actions">
+              <button class="btn-game-action" onclick="loadGame('${game.id}')">加载</button>
+              <button class="btn-game-action" onclick="editGame('${game.id}')">编辑</button>
+              <button class="btn-game-action" onclick="manageVersions('${game.id}')">版本</button>
+            </div>
+          `;
+          gamesList.appendChild(gameItem);
+        });
+      }
+    } catch (error) {
+      console.error('获取游戏列表失败', error);
+      gamesList.innerHTML = '<p class="empty-hint">获取游戏列表失败</p>';
+    }
+    
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('show'), 10);
+  }
+
+  function closeGamesList() {
+    const modal = document.getElementById('gamesListModal');
+    modal.classList.remove('show');
+    setTimeout(() => modal.style.display = 'none', 300);
+  }
+
+  async function loadGame(gameId) {
+    try {
+      const game = await storage.getGame(gameId);
+      if (game) {
+        document.getElementById('codeArea').value = game.code;
+        currentCode = game.code;
+        applyCode();
+        closeGamesList();
+      }
+    } catch (error) {
+      console.error('加载游戏失败', error);
+      alert('加载游戏失败: ' + error.message);
+    }
+  }
+
+  async function editGame(gameId) {
+    try {
+      const game = await storage.getGame(gameId);
+      if (game) {
+        document.getElementById('codeArea').value = game.code;
+        currentCode = game.code;
+        applyCode();
+        closeGamesList();
+      }
+    } catch (error) {
+      console.error('加载游戏失败', error);
+      alert('加载游戏失败: ' + error.message);
+    }
+  }
+
+  // ===== 版本管理功能 =====
+  async function manageVersions(gameId) {
+    const modal = document.getElementById('versionsModal');
+    const versionsList = document.getElementById('versionsList');
+    const versionGameName = document.getElementById('versionGameName');
+    
+    try {
+      // 从IndexedDB获取游戏
+      const game = await storage.getGame(gameId);
+      
+      if (game) {
+        versionGameName.textContent = game.name;
+        
+        if (game.versions && game.versions.length > 0) {
+          versionsList.innerHTML = '';
+          // 按时间倒序排序版本
+          const sortedVersions = [...game.versions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          
+          sortedVersions.forEach((version, index) => {
+            const versionItem = document.createElement('div');
+            versionItem.className = 'version-item';
+            versionItem.innerHTML = `
+              <div class="version-item-header">
+                <div class="version-item-date">版本 ${sortedVersions.length - index} - ${new Date(version.createdAt).toLocaleString()}</div>
+              </div>
+              <div class="version-item-actions">
+                <button class="btn-version-action" onclick="loadVersion('${game.id}', '${version.id}')">加载</button>
+              </div>
+            `;
+            versionsList.appendChild(versionItem);
+          });
+        } else {
+          versionsList.innerHTML = '<p class="empty-hint">暂无版本记录</p>';
+        }
+        
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 10);
+      }
+    } catch (error) {
+      console.error('获取游戏版本失败', error);
+      versionsList.innerHTML = '<p class="empty-hint">获取版本记录失败</p>';
+      modal.style.display = 'flex';
+      setTimeout(() => modal.classList.add('show'), 10);
+    }
+  }
+
+  function closeVersionsModal() {
+    const modal = document.getElementById('versionsModal');
+    modal.classList.remove('show');
+    setTimeout(() => modal.style.display = 'none', 300);
+  }
+
+  async function loadVersion(gameId, versionId) {
+    try {
+      const game = await storage.getGame(gameId);
+      if (game) {
+        const version = game.versions.find(v => v.id === versionId);
+        if (version) {
+          document.getElementById('codeArea').value = version.code;
+          currentCode = version.code;
+          applyCode();
+          closeVersionsModal();
+        }
+      }
+    } catch (error) {
+      console.error('加载版本失败', error);
+      alert('加载版本失败: ' + error.message);
+    }
+  }
+
+  // ===== 游戏融合功能 =====
+  async function showFusionForm() {
+    const modal = document.getElementById('fusionModal');
+    const fusionGamesList = document.getElementById('fusionGamesList');
+    
+    try {
+      // 从IndexedDB获取游戏
+      const games = await storage.getAllGames();
+      
+      if (games.length === 0) {
+        fusionGamesList.innerHTML = '<p class="empty-hint">暂无游戏可选择</p>';
+      } else if (games.length < 2) {
+        fusionGamesList.innerHTML = '<p class="empty-hint">至少需要2个游戏才能融合</p>';
+      } else {
+        fusionGamesList.innerHTML = '';
+        games.forEach(game => {
+          const gameItem = document.createElement('div');
+          gameItem.className = 'fusion-game-item';
+          gameItem.innerHTML = `
+            <input type="checkbox" id="fusion_${game.id}" value="${game.id}">
+            <label for="fusion_${game.id}">${game.name}</label>
+          `;
+          fusionGamesList.appendChild(gameItem);
+        });
+      }
+    } catch (error) {
+      console.error('获取游戏列表失败', error);
+      fusionGamesList.innerHTML = '<p class="empty-hint">获取游戏列表失败</p>';
+    }
+    
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('show'), 10);
+  }
+
+  function closeFusionForm() {
+    const modal = document.getElementById('fusionModal');
+    modal.classList.remove('show');
+    setTimeout(() => modal.style.display = 'none', 300);
+  }
+
+  async function fuseGames() {
+    const fusionPrompt = document.getElementById('fusionPrompt').value.trim();
+    const checkboxes = document.querySelectorAll('#fusionGamesList input[type="checkbox"]:checked');
+    
+    if (checkboxes.length < 2) {
+      alert('请至少选择2个游戏进行融合！');
+      return;
+    }
+    
+    try {
+      // 获取选中的游戏
+      const games = await storage.getAllGames();
+      const selectedGames = [];
+      checkboxes.forEach(checkbox => {
+        const gameId = checkbox.value;
+        const game = games.find(g => g.id === gameId);
+        if (game) {
+          selectedGames.push(game);
+        }
+      });
+      
+      if (selectedGames.length < 2) {
+        alert('请至少选择2个游戏进行融合！');
+        return;
+      }
+      
+      // 生成融合提示词
+      let prompt = '融合以下游戏的特点，创建一个新的网页游戏：\n';
+      selectedGames.forEach((game, index) => {
+        prompt += `游戏${index + 1}：${game.name} - ${game.description || '无描述'}\n`;
+      });
+      
+      if (fusionPrompt) {
+        prompt += `\n融合要求：${fusionPrompt}`;
+      }
+      
+      // 生成融合游戏代码
+      const code = await generateGameByAI(prompt, false);
+      if (code) {
+        document.getElementById('codeArea').value = code;
+        applyCode();
+        closeFusionForm();
+      }
+    } catch (error) {
+      console.error('融合游戏失败', error);
+      alert('融合游戏失败: ' + error.message);
+    }
+  }
+
+  // ===== 游戏数据导入导出功能 =====
+  async function exportGames() {
+    try {
+      const games = await storage.getAllGames();
+      if (games.length === 0) {
+        alert('暂无游戏可导出！');
+        return;
+      }
+      
+      const exportData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        games: games
+      };
+      
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `gamedev-ai-export-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      alert('游戏导出成功！');
+    } catch (error) {
+      console.error('导出游戏失败', error);
+      alert('导出游戏失败: ' + error.message);
+    }
+  }
+
+  async function importGames(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const importData = JSON.parse(e.target.result);
+          if (!importData.games || !Array.isArray(importData.games)) {
+            alert('导入文件格式错误！');
+            return;
+          }
+          
+          // 导入游戏数据
+          for (const game of importData.games) {
+            await storage.saveGame(game);
+          }
+          
+          alert(`成功导入 ${importData.games.length} 个游戏！`);
+          await showGamesList(); // 刷新游戏列表
+          await updateReferenceGames(); // 更新参考游戏列表
+        } catch (error) {
+          console.error('解析导入文件失败', error);
+          alert('解析导入文件失败: ' + error.message);
+        }
+      };
+      reader.onerror = () => {
+        alert('读取文件失败！');
+      };
+      reader.readAsText(file);
+    } catch (error) {
+      console.error('导入游戏失败', error);
+      alert('导入游戏失败: ' + error.message);
+    }
+  }
+
+  // ===== 从云端恢复功能 =====
+  async function restoreFromCloud() {
+    if (typeof openclawStorage === 'undefined') {
+      alert('OpenClaw存储服务未加载！');
+      return;
+    }
+
+    try {
+      console.log('正在从OpenClaw云端恢复游戏...');
+      const result = await openclawStorage.restoreGamesFromCloud();
+      
+      if (result.success) {
+        alert(`成功从云端恢复 ${result.count} 个游戏！`);
+        await showGamesList(); // 刷新游戏列表
+        await updateReferenceGames(); // 更新参考游戏列表
+      } else {
+        if (result.error === '服务不可用') {
+          alert('OpenClaw云端服务当前不可用，请检查网络连接或稍后再试。');
+        } else {
+          alert('从云端恢复失败: ' + result.error);
+        }
+      }
+    } catch (error) {
+      console.error('从云端恢复失败', error);
+      alert('从云端恢复失败: ' + error.message);
+    }
+  }
+
+  // ===== 存储状态管理功能 =====
+  async function showStorageStatus() {
+    const modal = document.getElementById('storageStatusModal');
+    const gameCountEl = document.getElementById('storageGameCount');
+    const storageSizeEl = document.getElementById('storageSize');
+    const cloudGameCountEl = document.getElementById('cloudGameCount');
+    const cloudSyncStatusEl = document.getElementById('cloudSyncStatus');
+    const lastCloudSyncEl = document.getElementById('lastCloudSync');
+    
+    try {
+      // 获取本地存储状态
+      const usage = await storage.getStorageUsage();
+      gameCountEl.textContent = usage.gameCount;
+      storageSizeEl.textContent = usage.totalSizeMB + ' MB';
+    } catch (error) {
+      console.error('获取本地存储状态失败', error);
+      gameCountEl.textContent = '错误';
+      storageSizeEl.textContent = '错误';
+    }
+    
+    try {
+      // 获取云端存储状态
+      if (typeof openclawStorage !== 'undefined') {
+        const cloudStatus = await openclawStorage.getCloudStorageStatus();
+        cloudGameCountEl.textContent = cloudStatus.gameCount;
+        
+        if (cloudStatus.available) {
+          cloudSyncStatusEl.textContent = '已连接';
+          cloudSyncStatusEl.style.color = 'var(--neon-green)';
+          lastCloudSyncEl.textContent = cloudStatus.lastSync ? new Date(cloudStatus.lastSync).toLocaleString() : '从未';
+        } else {
+          cloudSyncStatusEl.textContent = '未连接';
+          cloudSyncStatusEl.style.color = 'var(--neon-red)';
+          lastCloudSyncEl.textContent = '服务不可用';
+        }
+      } else {
+        cloudGameCountEl.textContent = 'N/A';
+        cloudSyncStatusEl.textContent = '未加载';
+        cloudSyncStatusEl.style.color = 'var(--text-dim)';
+        lastCloudSyncEl.textContent = '从未';
+      }
+    } catch (error) {
+      console.error('获取云端存储状态失败', error);
+      cloudGameCountEl.textContent = '错误';
+      cloudSyncStatusEl.textContent = '错误';
+      cloudSyncStatusEl.style.color = 'var(--neon-red)';
+      lastCloudSyncEl.textContent = '获取失败';
+    }
+    
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('show'), 10);
+  }
+
+  function closeStorageStatus() {
+    const modal = document.getElementById('storageStatusModal');
+    modal.classList.remove('show');
+    setTimeout(() => modal.style.display = 'none', 300);
+  }
+
+  // ===== 自动保存功能 =====
+  let autoSaveTimer = null;
+  let lastCode = '';
+
+  function initAutoSave() {
+    const codeArea = document.getElementById('codeArea');
+    codeArea.addEventListener('input', () => {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        autoSave();
+      }, 30000); // 30秒自动保存
+    });
+  }
+
+  async function autoSave() {
+    const code = document.getElementById('codeArea').value.trim();
+    if (!code || code === lastCode) return;
+
+    try {
+      // 检查是否有未保存的游戏
+      const games = await storage.getAllGames();
+      if (games.length > 0) {
+        // 自动保存到最新的游戏
+        const latestGame = games[games.length - 1];
+        latestGame.code = code;
+        latestGame.updatedAt = new Date().toISOString();
+        
+        // 创建新版本
+        const newVersion = {
+          id: Date.now().toString(),
+          code: code,
+          createdAt: new Date().toISOString()
+        };
+        latestGame.versions.push(newVersion);
+        
+        await storage.saveGame(latestGame);
+        lastCode = code;
+        
+        // 更新自动保存状态
+        document.getElementById('lastSaveTime').textContent = `上次保存: ${new Date().toLocaleString()}`;
+        console.log('自动保存成功');
+      }
+    } catch (error) {
+      console.error('自动保存失败', error);
+    }
+  }
+
+  // ===== 初始化 =====
+  window.addEventListener('DOMContentLoaded', async () => {
+    const saved = localStorage.getItem('LLM_API_KEY');
+    if (saved) document.getElementById('apiKeyInput').value = saved;
+    
+    try {
+      // 初始化IndexedDB
+      await storage.migrateFromLocalStorage();
+      console.log('数据迁移完成');
+      
+      // 注入openclawcopy.txt中的游戏数据
+      if (typeof injectGames === 'function') {
+        await injectGames();
+        console.log('游戏数据注入完成');
+      }
+    } catch (error) {
+      console.error('初始化存储失败', error);
+    }
+    
+    await updateReferenceGames(); // 初始化参考游戏列表
+    initAutoSave(); // 初始化自动保存
+  });
+
+</script>
+</body>
+</html>
