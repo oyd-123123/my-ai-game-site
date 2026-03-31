@@ -23,7 +23,8 @@ const PUBLIC_GAMES_CONFIG = {
   setToken(token) {
     localStorage.setItem('GIST_TOKEN', token);
     this._token = token;
-  },
+  }
+};
 
 const publicGames = {
   _cache: null,
