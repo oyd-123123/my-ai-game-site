@@ -8,3 +8,6 @@ ngrok.zip
 __pycache__/
 *.pyc
 .trae/
+
+# 敏感配置（含Token，不提交）
+config.js

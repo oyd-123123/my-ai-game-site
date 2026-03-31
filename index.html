@@ -695,10 +695,13 @@ const STORY_PROMPTS = {
     try {
       const game = await storage.getGame(gameId);
       if (!game) return;
+      showLoading(true, '🌐 正在发布到公共游戏库...');
       await publicGames.addGame(game);
-      alert(`「${game.name}」已加入公共游戏库！\n（下次打开游戏列表所有用户都能看到）`);
+      showLoading(false);
+      alert(`🎉「${game.name}」已成功发布到公共游戏库！\n所有用户现在都能看到这个游戏。`);
       showGamesList(); // 刷新列表
     } catch(e) {
+      showLoading(false);
       alert('发布失败: ' + e.message);
     }
   }

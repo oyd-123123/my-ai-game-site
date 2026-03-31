@@ -1,13 +1,20 @@
-// public-games.js - 公共游戏列表（基于 GitHub Gist）
-// 所有用户共享同一份游戏列表
+// public-games.js - 公共游戏列表（基于 GitHub Gist 实时同步）
 
 const PUBLIC_GAMES_CONFIG = {
   gistId: '3b957cf4aea0a7b8a2a2435452917b93',
   gistOwner: 'oyd-123123',
   filename: 'games-db.json',
-  // raw URL 加时间戳防缓存
+  // Token 仅用于写入 Gist，从 config.js 或本地存储读取，不硬编码
+  get token() {
+    return (typeof GIST_TOKEN !== 'undefined' && GIST_TOKEN)
+      || localStorage.getItem('GIST_TOKEN')
+      || '';
+  },
   get rawUrl() {
     return `https://gist.githubusercontent.com/${this.gistOwner}/${this.gistId}/raw/${this.filename}?t=${Date.now()}`;
+  },
+  get apiUrl() {
+    return `https://api.github.com/gists/${this.gistId}`;
   }
 };
 
@@ -24,52 +31,90 @@ const publicGames = {
     }
     try {
       const res = await fetch(PUBLIC_GAMES_CONFIG.rawUrl);
-      if (!res.ok) throw new Error('fetch failed');
+      if (!res.ok) throw new Error('fetch failed ' + res.status);
       const data = await res.json();
       this._cache = data.games || [];
       this._cacheTime = now;
       return this._cache;
     } catch (e) {
-      console.warn('公共游戏列表加载失败，使用本地缓存', e);
+      console.warn('公共游戏列表加载失败', e);
       return this._cache || [];
     }
   },
 
-  // 上传游戏到公共列表（通过 gh CLI 后端接口更新 Gist）
-  // 前端无法直接写 Gist（需要 token），改为：保存时同时写入一个"待同步"队列
-  // 由页面提示用户，或由站长定期同步
+  // 发布游戏到公共库（直接写入 Gist）
   async addGame(game) {
-    // 读取现有列表
+    // 先读取最新列表
+    this._cache = null; // 强制刷新
     const games = await this.getAll();
+
     // 去重（同 id 则更新）
-    const idx = games.findIndex(g => g.id === game.id);
     const publicGame = {
       id: game.id,
       name: game.name,
       description: game.description || '',
       code: game.code,
       createdAt: game.createdAt,
-      updatedAt: game.updatedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       author: 'anonymous'
     };
+    const idx = games.findIndex(g => g.id === game.id);
     if (idx >= 0) {
       games[idx] = publicGame;
     } else {
       games.unshift(publicGame);
     }
-    // 存入 localStorage 待同步队列
-    const pending = JSON.parse(localStorage.getItem('PUBLIC_GAMES_PENDING') || '[]');
-    const pidx = pending.findIndex(g => g.id === game.id);
-    if (pidx >= 0) pending[pidx] = publicGame; else pending.unshift(publicGame);
-    localStorage.setItem('PUBLIC_GAMES_PENDING', JSON.stringify(pending));
+
+    // 写入 Gist
+    const newContent = JSON.stringify({ games, updatedAt: new Date().toISOString() }, null, 2);
+    const res = await fetch(PUBLIC_GAMES_CONFIG.apiUrl, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'Bearer ' + PUBLIC_GAMES_CONFIG.token,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github+json'
+      },
+      body: JSON.stringify({
+        files: {
+          [PUBLIC_GAMES_CONFIG.filename]: { content: newContent }
+        }
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Gist 写入失败');
+    }
+
     // 更新本地缓存
     this._cache = games;
+    this._cacheTime = Date.now();
     return true;
   },
 
-  // 获取待同步数量
-  getPendingCount() {
-    return JSON.parse(localStorage.getItem('PUBLIC_GAMES_PENDING') || '[]').length;
+  // 从公共库删除游戏（仅站长用）
+  async removeGame(gameId) {
+    this._cache = null;
+    const games = await this.getAll();
+    const filtered = games.filter(g => g.id !== gameId);
+    const newContent = JSON.stringify({ games: filtered, updatedAt: new Date().toISOString() }, null, 2);
+    const res = await fetch(PUBLIC_GAMES_CONFIG.apiUrl, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'Bearer ' + PUBLIC_GAMES_CONFIG.token,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github+json'
+      },
+      body: JSON.stringify({
+        files: {
+          [PUBLIC_GAMES_CONFIG.filename]: { content: newContent }
+        }
+      })
+    });
+    if (!res.ok) throw new Error('删除失败');
+    this._cache = filtered;
+    this._cacheTime = Date.now();
+    return true;
   }
 };
 
