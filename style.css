@@ -860,6 +860,24 @@ body::before {
   color: var(--neon-blue);
 }
 
+.btn-upgrade {
+  background: linear-gradient(135deg, rgba(255,200,0,0.15), rgba(255,100,0,0.15));
+  border: 1px solid rgba(255,180,0,0.6);
+  color: #ffcc00;
+  padding: 10px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+
+.btn-upgrade:hover {
+  background: linear-gradient(135deg, rgba(255,200,0,0.3), rgba(255,100,0,0.3));
+  box-shadow: 0 0 12px rgba(255,180,0,0.4);
+  transform: translateY(-1px);
+}
+
 /* ===== 提示词分组标签 ===== */
 .prompt-section-label {
   font-size: 0.75rem;

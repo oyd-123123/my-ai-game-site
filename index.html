@@ -98,7 +98,7 @@
       <div class="btn-group">
         <button class="btn-primary" onclick="handleGenerate()">🚀 生成游戏</button>
         <button class="btn-secondary" onclick="handleModify()">🔁 迭代修改</button>
-        <button class="btn-danger" onclick="handleReset()">🔄 重置记忆</button>
+        <button class="btn-upgrade" onclick="handleAutoUpgrade()">⬆️ 自动升级</button>
       </div>
     </div>
 
@@ -399,12 +399,28 @@ const STORY_PROMPTS = {
     }
   }
 
-  // ===== 重置AI记忆 =====
-  function handleReset() {
-    if (!confirm('确定要清空AI记忆吗？这会重置所有对话历史。')) return;
-    resetGameGenerator();
-    document.getElementById('historyCount').textContent = '0';
-    setPreviewStatus('已重置');
+  // ===== 自动升级 =====
+  async function handleAutoUpgrade() {
+    if (!currentCode) { alert('请先生成或加载一个游戏再自动升级！'); return; }
+    const upgradeOptions = [
+      '增加背景音效和音乐，提升游戏氛围',
+      '优化游戏画面，增加粒子特效和动画',
+      '增加难度递进系统，随分数提升游戏难度',
+      '增加排行榜，记录历史最高分',
+      '增加道具和奖励系统',
+      '优化操作手感，增加移动端触屏支持',
+      '增加暂停功能和设置菜单',
+      '增加连击/combo系统和得分倍率',
+    ];
+    const randomUpgrade = upgradeOptions[Math.floor(Math.random() * upgradeOptions.length)];
+    document.getElementById('aiPrompt').value = randomUpgrade;
+    setPreviewStatus('⬆️ 自动升级中...');
+    const code = await generateGameByAI(randomUpgrade, true);
+    if (code) {
+      document.getElementById('codeArea').value = code;
+      applyCode();
+      updateHistoryCount();
+    }
   }
 
   // ===== 加载内置游戏 =====
