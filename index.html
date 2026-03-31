@@ -43,6 +43,23 @@
   <!-- ===== 左侧控制面板 ===== -->
   <aside class="sidebar">
 
+    <!-- 搜索框 -->
+    <div class="panel" style="padding: 12px 16px;">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          id="gameSearchInput"
+          class="game-search-input"
+          placeholder="搜索游戏类型或描述..."
+          oninput="filterPromptTags(this.value)"
+          autocomplete="off"
+        >
+        <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display:none;">✕</button>
+      </div>
+      <div id="searchResults" class="search-results" style="display:none;"></div>
+    </div>
+
     <!-- AI 生成器 -->
     <div class="panel">
       <div class="panel-title">🤖 AI 游戏生成器</div>
@@ -981,6 +998,97 @@
     initAutoSave(); // 初始化自动保存
   });
 
+</script>
+
+<script>
+// ===== 游戏搜索功能 =====
+const GAME_TAGS = [
+  { label: '太空射击', prompt: '太空射击游戏，方向键控制飞船，空格键射击，击落陨石得分，有生命值' },
+  { label: '打砖块',   prompt: '打砖块游戏，鼠标控制挡板，多种颜色砖块，有得分和关卡' },
+  { label: '贪吃蛇',   prompt: '贪吃蛇游戏，方向键控制，吃食物变长，有最高分记录' },
+  { label: '平台跳跃', prompt: '2D平台跳跃游戏，左右移动加跳跃，收集金币，有障碍物' },
+  { label: '俄罗斯方块', prompt: '俄罗斯方块，方向键控制，有得分和等级提升' },
+  { label: '迷宫',     prompt: '迷宫游戏，方向键走迷宫，找到出口，有计时器' },
+];
+
+function filterPromptTags(val) {
+  const clearBtn = document.getElementById('searchClearBtn');
+  const resultsBox = document.getElementById('searchResults');
+  const q = val.trim().toLowerCase();
+
+  clearBtn.style.display = q ? 'flex' : 'none';
+
+  if (!q) {
+    resultsBox.style.display = 'none';
+    resultsBox.innerHTML = '';
+    return;
+  }
+
+  // 搜索内置标签
+  const matched = GAME_TAGS.filter(t =>
+    t.label.toLowerCase().includes(q) || t.prompt.toLowerCase().includes(q)
+  );
+
+  // 搜索已保存游戏
+  let savedGames = [];
+  try {
+    savedGames = JSON.parse(localStorage.getItem('GAMEDEV_GAMES') || '[]');
+  } catch(e) {}
+  const matchedSaved = savedGames.filter(g =>
+    (g.name || '').toLowerCase().includes(q) ||
+    (g.description || '').toLowerCase().includes(q)
+  );
+
+  if (matched.length === 0 && matchedSaved.length === 0) {
+    resultsBox.innerHTML = '<div class="search-empty">没有找到匹配的游戏</div>';
+    resultsBox.style.display = 'block';
+    return;
+  }
+
+  let html = '';
+  matched.forEach(t => {
+    html += `<div class="search-result-item" onclick="selectSearchResult('${t.prompt.replace(/'/g,"\\'")}')">
+      <span class="search-result-icon">🎮</span>
+      <span class="search-result-label">${t.label}</span>
+    </div>`;
+  });
+  matchedSaved.forEach(g => {
+    const desc = (g.description || '').slice(0, 30);
+    html += `<div class="search-result-item" onclick="selectSearchResult('${(g.description||g.name).replace(/'/g,"\\'")}')">
+      <span class="search-result-icon">💾</span>
+      <span class="search-result-label">${g.name}</span>
+      ${desc ? `<span class="search-result-desc">${desc}</span>` : ''}
+    </div>`;
+  });
+
+  resultsBox.innerHTML = html;
+  resultsBox.style.display = 'block';
+}
+
+function selectSearchResult(prompt) {
+  const promptEl = document.getElementById('aiPrompt');
+  if (promptEl) promptEl.value = prompt;
+  clearSearch();
+  promptEl && promptEl.focus();
+}
+
+function clearSearch() {
+  const input = document.getElementById('gameSearchInput');
+  const clearBtn = document.getElementById('searchClearBtn');
+  const resultsBox = document.getElementById('searchResults');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (resultsBox) { resultsBox.style.display = 'none'; resultsBox.innerHTML = ''; }
+}
+
+// 点击外部关闭搜索结果
+document.addEventListener('click', e => {
+  const wrap = document.querySelector('.search-wrap');
+  const results = document.getElementById('searchResults');
+  if (wrap && results && !wrap.contains(e.target) && !results.contains(e.target)) {
+    results.style.display = 'none';
+  }
+});
 </script>
 </body>
 </html>

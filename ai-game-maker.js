@@ -99,8 +99,9 @@ async function generateGameByAI(prompt, isModify = false) {
     // 清理markdown代码块
     code = code.replace(/^```html\n?/i, '').replace(/^```\n?/i, '').replace(/\n?```$/i, '').trim();
 
-    // 更新历史
-    gameHistory.push({ role: "user", content: prompt });
+    // 更新历史（使用完整 messages 中最后一条 user content，保留参考游戏上下文）
+    const lastUserMsg = messages[messages.length - 1];
+    gameHistory.push({ role: "user", content: lastUserMsg.content });
     gameHistory.push({ role: "assistant", content: code });
     if (gameHistory.length > 20) gameHistory = gameHistory.slice(-20);
 
@@ -138,13 +139,25 @@ function addHistoryItem(type, text) {
 
   const div = document.createElement('div');
   div.className = 'history-item';
-  div.innerHTML = `<span class="history-type">${type}</span><span class="history-text">${text.slice(0, 40)}${text.length > 40 ? '...' : ''}</span>`;
+  // 使用 textContent 避免 XSS
+  const typeSpan = document.createElement('span');
+  typeSpan.className = 'history-type';
+  typeSpan.textContent = type;
+  const textSpan = document.createElement('span');
+  textSpan.className = 'history-text';
+  textSpan.textContent = text.slice(0, 40) + (text.length > 40 ? '...' : '');
+  div.appendChild(typeSpan);
+  div.appendChild(textSpan);
   div.onclick = () => {
     // 点击历史可以重新填入prompt
     const promptEl = document.getElementById('aiPrompt');
     if (promptEl) promptEl.value = text;
   };
   log.prepend(div);
+
+  // 更新历史数量 badge
+  const badge = document.getElementById('historyCount');
+  if (badge) badge.textContent = log.querySelectorAll('.history-item').length;
 }
 
 // ===== 内置太空游戏代码 =====
