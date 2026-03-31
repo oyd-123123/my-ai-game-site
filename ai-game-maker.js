@@ -40,7 +40,12 @@ async function generateGameByAI(prompt, isModify = false) {
 3. 必须包含：游戏开始、运行循环、结束判断、得分显示、重新开始功能。
 4. 修改时必须保留原有全部功能，只按用户要求优化或新增。
 5. 代码风格：深色背景，霓虹色调，好看的游戏UI。
-6. 当有参考游戏时，借鉴参考游戏的风格、功能和代码结构，但不要直接复制，而是创造性地融合到新游戏中。`
+6. 当有参考游戏时，借鉴参考游戏的风格、功能和代码结构，但不要直接复制，而是创造性地融合到新游戏中。
+7. 如果游戏需要调用AI API（如文字冒险、剧情驱动类游戏），必须使用以下配置，不得硬编码其他地址：
+   - API地址：${API_CONFIG.apiUrl}
+   - 模型：${API_CONFIG.endpoint}
+   - API Key：从页面顶部输入框读取，JS代码示例：document.getElementById('apiKeyInput')?.value || localStorage.getItem('LLM_API_KEY') || ''
+   - 如果页面内没有 apiKeyInput 元素，则在游戏页面内自己创建一个 API Key 输入框让用户填写。`
     }
   ];
 
