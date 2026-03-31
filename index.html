@@ -317,6 +317,7 @@
 <script src="storage.js"></script>
 <script src="inject-games.js"></script>
 <script src="openclaw-storage.js"></script>
+<script src="public-games.js"></script>
 <script src="ai-game-maker.js"></script>
 
 <!-- 文字冒险游戏提示词模板 -->
@@ -581,40 +582,72 @@ const STORY_PROMPTS = {
   async function showGamesList() {
     const modal = document.getElementById('gamesListModal');
     const gamesList = document.getElementById('gamesList');
-    
+    gamesList.innerHTML = '<p class="empty-hint">⏳ 加载公共游戏列表...</p>';
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('show'), 10);
+
     try {
-      // 从IndexedDB获取游戏
-      const games = await storage.getAllGames();
-      
-      if (games.length === 0) {
-        gamesList.innerHTML = '<p class="empty-hint">暂无保存的游戏</p>';
-      } else {
-        gamesList.innerHTML = '';
-        games.forEach(game => {
-          const gameItem = document.createElement('div');
-          gameItem.className = 'game-item';
-          gameItem.innerHTML = `
-            <div class="game-item-header">
-              <div class="game-item-title">${game.name}</div>
-              <div class="game-item-date">${new Date(game.createdAt).toLocaleString()}</div>
-            </div>
-            <div class="game-item-description">${game.description || '无描述'}</div>
-            <div class="game-item-actions">
-              <button class="btn-game-action" onclick="loadGame('${game.id}')">▶ 加载</button>
-              <button class="btn-game-action" onclick="upgradeGame('${game.id}', '${game.name.replace(/'/g,"\\'")}')">⬆️ 升级</button>
-              <button class="btn-game-action" onclick="manageVersions('${game.id}')">📋 版本</button>
-            </div>
-          `;
-          gamesList.appendChild(gameItem);
-        });
+      // 并行获取公共游戏 + 本地游戏
+      const [publicList, localList] = await Promise.all([
+        publicGames.getAll().catch(() => []),
+        storage.getAllGames().catch(() => [])
+      ]);
+
+      // 合并：公共游戏优先，本地独有的追加在后
+      const localOnlyIds = new Set(localList.map(g => g.id));
+      publicList.forEach(g => localOnlyIds.delete(g.id));
+      const localOnly = localList.filter(g => localOnlyIds.has(g.id));
+      const merged = [...publicList, ...localOnly];
+
+      if (merged.length === 0) {
+        gamesList.innerHTML = '<p class="empty-hint">暂无游戏，快去生成第一个吧！</p>';
+        return;
       }
+
+      gamesList.innerHTML = '';
+
+      // 公共游戏区块标题
+      if (publicList.length > 0) {
+        const label = document.createElement('div');
+        label.className = 'games-section-label';
+        label.innerHTML = '🌐 公共游戏库 <span style="color:var(--text-dim);font-weight:normal;">（所有用户共享）</span>';
+        gamesList.appendChild(label);
+      }
+
+      publicList.forEach(game => renderGameItem(gamesList, game, false));
+
+      if (localOnly.length > 0) {
+        const label2 = document.createElement('div');
+        label2.className = 'games-section-label';
+        label2.style.marginTop = '16px';
+        label2.innerHTML = '💾 我的本地游戏';
+        gamesList.appendChild(label2);
+        localOnly.forEach(game => renderGameItem(gamesList, game, true));
+      }
+
     } catch (error) {
       console.error('获取游戏列表失败', error);
       gamesList.innerHTML = '<p class="empty-hint">获取游戏列表失败</p>';
     }
-    
-    modal.style.display = 'flex';
-    setTimeout(() => modal.classList.add('show'), 10);
+  }
+
+  function renderGameItem(container, game, isLocal) {
+    const gameItem = document.createElement('div');
+    gameItem.className = 'game-item';
+    gameItem.innerHTML = `
+      <div class="game-item-header">
+        <div class="game-item-title">${game.name}</div>
+        <div class="game-item-date">${new Date(game.createdAt).toLocaleDateString()}</div>
+      </div>
+      <div class="game-item-description">${game.description || '无描述'}</div>
+      <div class="game-item-actions">
+        <button class="btn-game-action" onclick="loadGame('${game.id}', ${JSON.stringify(game.code).replace(/"/g,'&quot;')})">▶ 加载</button>
+        <button class="btn-game-action" onclick="upgradeGame('${game.id}', '${game.name.replace(/'/g,"\\'")}')">⬆️ 升级</button>
+        <button class="btn-game-action" onclick="manageVersions('${game.id}')">📋 版本</button>
+        ${isLocal ? `<button class="btn-game-action btn-publish" onclick="publishGame('${game.id}')">🌐 发布</button>` : ''}
+      </div>
+    `;
+    container.appendChild(gameItem);
   }
 
   function closeGamesList() {
@@ -623,12 +656,16 @@ const STORY_PROMPTS = {
     setTimeout(() => modal.style.display = 'none', 300);
   }
 
-  async function loadGame(gameId) {
+  async function loadGame(gameId, directCode) {
     try {
-      const game = await storage.getGame(gameId);
-      if (game) {
-        document.getElementById('codeArea').value = game.code;
-        currentCode = game.code;
+      let code = directCode || null;
+      if (!code) {
+        const game = await storage.getGame(gameId);
+        if (game) code = game.code;
+      }
+      if (code) {
+        document.getElementById('codeArea').value = code;
+        currentCode = code;
         applyCode();
         closeGamesList();
       }
@@ -653,7 +690,18 @@ const STORY_PROMPTS = {
     }
   }
 
-  // ===== 升级游戏（加载后跳到迭代修改输入框）=====
+  // ===== 发布游戏到公共库 =====
+  async function publishGame(gameId) {
+    try {
+      const game = await storage.getGame(gameId);
+      if (!game) return;
+      await publicGames.addGame(game);
+      alert(`「${game.name}」已加入公共游戏库！\n（下次打开游戏列表所有用户都能看到）`);
+      showGamesList(); // 刷新列表
+    } catch(e) {
+      alert('发布失败: ' + e.message);
+    }
+  }
   async function upgradeGame(gameId, gameName) {
     try {
       const game = await storage.getGame(gameId);

@@ -899,6 +899,26 @@ body::before {
   background: rgba(191,0,255,0.15);
 }
 
+.games-section-label {
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: var(--neon-blue);
+  padding: 8px 4px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+.btn-publish {
+  background: rgba(191,0,255,0.08) !important;
+  border-color: rgba(191,0,255,0.4) !important;
+  color: var(--neon-purple) !important;
+}
+
+.btn-publish:hover {
+  background: rgba(191,0,255,0.18) !important;
+  border-color: var(--neon-purple) !important;
+}
+
 /* ===== 游戏搜索 ===== */
 .search-wrap {
   position: relative;
