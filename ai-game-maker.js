@@ -1,5 +1,12 @@
 // ai-game-maker.js —— 多轮迭代版（完整）
 
+// 默认 API 配置（站点配置不可用时的备选）
+var API_CONFIG = typeof API_CONFIG !== 'undefined' ? API_CONFIG : {
+  apiKey: "",
+  endpoint: "ep-20260312161928-thlqj",
+  apiUrl: "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+};
+
 let gameHistory = [];
 let currentCode = '';
 let generationCount = 0;
