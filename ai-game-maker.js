@@ -1,8 +1,8 @@
 // ai-game-maker.js —— 多轮迭代版（完整）
 
-// API 配置（默认 API Key）
+// API 配置（默认 API Key，优先使用 localStorage 中用户保存的值）
 var API_CONFIG = {
-  apiKey: "bfefae5b-eec2-4b42-b764-71415269a75d",
+  apiKey: localStorage.getItem('LLM_API_KEY') || 'bfefae5b-eec2-4b42-b764-71415269a75d',
   endpoint: "ep-20260312161928-thlqj",
   apiUrl: "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
 };

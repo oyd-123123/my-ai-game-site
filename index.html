@@ -1183,12 +1183,13 @@ ${code.slice(0, 800)}
 
   // ===== 初始化 =====
   window.addEventListener('DOMContentLoaded', async () => {
-    // API Key 自动填入默认值
-    const savedKey = localStorage.getItem('LLM_API_KEY') || API_CONFIG.apiKey;
+    // API Key 自动填入默认值（直接写死，不依赖外部变量）
+    const DEFAULT_API_KEY = 'bfefae5b-eec2-4b42-b764-71415269a75d';
+    const savedKey = localStorage.getItem('LLM_API_KEY') || DEFAULT_API_KEY;
     document.getElementById('apiKeyInput').value = savedKey;
-    if (!localStorage.getItem('LLM_API_KEY')) {
-      localStorage.setItem('LLM_API_KEY', API_CONFIG.apiKey);
-    }
+    localStorage.setItem('LLM_API_KEY', savedKey);
+    // 同步到 API_CONFIG（等脚本加载完再同步）
+    window.__DEFAULT_API_KEY__ = savedKey;
     
     try {
       // 初始化IndexedDB
