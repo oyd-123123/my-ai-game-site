@@ -9,5 +9,5 @@ __pycache__/
 *.pyc
 .trae/
 
-# 敏感配置（含Token，不提交）
-config.js
+# 本地配置（包含敏感信息，不提交）
+site-config.js

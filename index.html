@@ -1203,17 +1203,18 @@ ${code.slice(0, 800)}
     await updateReferenceGames(); // 初始化参考游戏列表
     initAutoSave(); // 初始化自动保存
 
-    // 从 localStorage 恢复 API 配置
-    if (typeof API_CONFIG !== 'undefined') {
-      const savedApiKey = localStorage.getItem('LLM_API_KEY');
-      if (savedApiKey && !API_CONFIG.apiKey) {
-        API_CONFIG.apiKey = savedApiKey;
-        document.getElementById('apiKeyInput').value = savedApiKey;
+    // 强制从 site-config.js 覆盖配置（即使 localStorage 有旧值也覆盖）
+    if (typeof API_KEY !== 'undefined' && API_KEY) {
+      localStorage.setItem('LLM_API_KEY', API_KEY);
+      document.getElementById('apiKeyInput').value = API_KEY;
+      if (typeof API_CONFIG !== 'undefined') {
+        API_CONFIG.apiKey = API_KEY;
       }
-      const savedGistToken = localStorage.getItem('GIST_TOKEN');
-      if (savedGistToken) {
-        document.getElementById('gistTokenInput').value = savedGistToken;
-      }
+    }
+    
+    if (typeof GITHUB_TOKEN !== 'undefined' && GITHUB_TOKEN) {
+      localStorage.setItem('GIST_TOKEN', GITHUB_TOKEN);
+      document.getElementById('gistTokenInput').value = GITHUB_TOKEN;
     }
   });
 

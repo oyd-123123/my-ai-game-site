@@ -14,7 +14,7 @@ const PUBLIC_GAMES_CONFIG = {
     return `https://api.github.com/gists/${this.gistId}`;
   },
 
-  // Token 从页面顶部输入框或 localStorage 读取
+  // Token 从 localStorage 读取
   get token() {
     return localStorage.getItem('GIST_TOKEN') || '';
   },
