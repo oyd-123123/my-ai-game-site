@@ -1183,8 +1183,12 @@ ${code.slice(0, 800)}
 
   // ===== 初始化 =====
   window.addEventListener('DOMContentLoaded', async () => {
-    const saved = localStorage.getItem('LLM_API_KEY');
-    if (saved) document.getElementById('apiKeyInput').value = saved;
+    // API Key 自动填入默认值
+    const savedKey = localStorage.getItem('LLM_API_KEY') || API_CONFIG.apiKey;
+    document.getElementById('apiKeyInput').value = savedKey;
+    if (!localStorage.getItem('LLM_API_KEY')) {
+      localStorage.setItem('LLM_API_KEY', API_CONFIG.apiKey);
+    }
     
     try {
       // 初始化IndexedDB
@@ -1202,10 +1206,6 @@ ${code.slice(0, 800)}
     
     await updateReferenceGames(); // 初始化参考游戏列表
     initAutoSave(); // 初始化自动保存
-
-    // API Key 已有默认值，GitHub Token 从 site-config.js 读取（如果存在）
-    document.getElementById('apiKeyInput').value = API_CONFIG.apiKey;
-    localStorage.setItem('LLM_API_KEY', API_CONFIG.apiKey);
   });
 
 </script>
