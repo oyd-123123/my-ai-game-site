@@ -1203,14 +1203,9 @@ ${code.slice(0, 800)}
     await updateReferenceGames(); // 初始化参考游戏列表
     initAutoSave(); // 初始化自动保存
 
-    // 强制从 site-config.js 覆盖配置（即使 localStorage 有旧值也覆盖）
-    if (typeof API_KEY !== 'undefined' && API_KEY) {
-      localStorage.setItem('LLM_API_KEY', API_KEY);
-      document.getElementById('apiKeyInput').value = API_KEY;
-      if (typeof API_CONFIG !== 'undefined') {
-        API_CONFIG.apiKey = API_KEY;
-      }
-    }
+    // API Key 已有默认值，GitHub Token 从 site-config.js 读取
+    document.getElementById('apiKeyInput').value = API_CONFIG.apiKey;
+    localStorage.setItem('LLM_API_KEY', API_CONFIG.apiKey);
     
     if (typeof GITHUB_TOKEN !== 'undefined' && GITHUB_TOKEN) {
       localStorage.setItem('GIST_TOKEN', GITHUB_TOKEN);

@@ -1,8 +1,8 @@
 // ai-game-maker.js —— 多轮迭代版（完整）
 
-// API 配置（优先使用 site-config.js 中的值）
+// API 配置（默认 API Key）
 var API_CONFIG = {
-  apiKey: typeof API_KEY !== 'undefined' ? API_KEY : "",
+  apiKey: "bfefae5b-eec2-4b42-b764-71415269a75d",
   endpoint: "ep-20260312161928-thlqj",
   apiUrl: "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
 };
